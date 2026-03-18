@@ -28,14 +28,35 @@ function getAppliedFiles(content: string): string[] {
 }
 
 const BUILD_KEYWORDS = [
-  'create','build','make','develop','generate','write','design',
-  'сделай','создай','разработай','построй','напиши','сгенерируй',
-  'хочу','нужно','сайт','приложение','лендинг','страницу',
+  'create','build','make','develop','generate','design',
+  'сделай','создай','разработай','построй','сгенерируй',
+  'сайт','приложение','лендинг','страницу','проект','систему',
+]
+const GREETING_PATTERNS = [
+  /^(привет|хай|хэй|hello|hi|hey|sup|yo)[\s!.]*$/i,
+  /^(как дела|как ты|что нового|что умеешь|кто ты|расскажи о себе)[\s?!.]*$/i,
+  /^(добрый (день|вечер|утро))[\s!.]*$/i,
+  /^(thanks|спасибо|ок|окей|ok|okay|понял|понятно|хорошо)[\s!.]*$/i,
 ]
 
 function isBuildRequest(text: string): boolean {
-  const lower = text.toLowerCase()
+  const lower = text.toLowerCase().trim()
+  // Short messages or greetings = NOT a build request
+  if (lower.split(/\s+/).length < 4) return false
+  if (GREETING_PATTERNS.some((p) => p.test(lower))) return false
   return BUILD_KEYWORDS.some((k) => lower.includes(k))
+}
+
+// Extract file names being written from partial streaming content
+function getStreamingFiles(content: string): string[] {
+  const regex = /```\w+:([^\n]+)\n/g
+  const files: string[] = []
+  let m
+  while ((m = regex.exec(content)) !== null) {
+    const name = m[1].trim().split('/').pop() || m[1]
+    if (!files.includes(name)) files.push(name)
+  }
+  return files
 }
 
 function parsePlanItems(content: string): PlanItem[] {
@@ -91,6 +112,68 @@ function AgentBadge({ name, role, isStreaming }: { name: string; role?: AIRole; 
       {isStreaming && (
         <span className="text-[9px] text-[var(--text-muted)] animate-pulse">● working...</span>
       )}
+    </div>
+  )
+}
+
+// ─── Streaming Bubble ─────────────────────────────────────────────────────────
+
+function StreamingBubble({ role, agentName, content }: { role?: AIRole; agentName?: string; content: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const files = getStreamingFiles(content)
+  const label = agentName || 'AI'
+
+  const statusText =
+    role === 'planner' ? 'Составляю план...' :
+    role === 'coder' ? `${label} — пишет код` :
+    role === 'architect' ? `${label} — анализирует задачу` :
+    `${label} — обрабатывает запрос`
+
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Status row */}
+      <div className="flex items-center gap-2 text-violet-400">
+        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+        <span className="font-medium text-xs">{statusText}</span>
+      </div>
+
+      {/* Files being written */}
+      {files.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {files.map((f, i) => (
+            <div key={f} className="flex items-center gap-1.5 text-[11px]">
+              <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                i < files.length - 1 ? 'bg-green-400' : 'bg-violet-400 animate-pulse'
+              }`} />
+              <span className={i < files.length - 1 ? 'text-green-400' : 'text-violet-300'}>
+                {i < files.length - 1 ? '✓ ' : '✍ '}{f}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Expandable raw output */}
+      {content.length > 100 && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="text-[10px] text-[var(--text-muted)] hover:text-violet-400 text-left transition-colors"
+        >
+          {expanded ? '▲ скрыть вывод' : '▼ показать вывод'}
+        </button>
+      )}
+      {expanded && (
+        <pre className="text-[10px] text-[var(--text-muted)] max-h-40 overflow-y-auto bg-black/20 rounded p-2 font-mono">
+          {content.slice(-800)}
+        </pre>
+      )}
+
+      {/* Bouncing dots */}
+      <div className="flex gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+        <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+        <span className="w-1.5 h-1.5 rounded-full bg-violet-300 animate-bounce" style={{ animationDelay: '300ms' }} />
+      </div>
     </div>
   )
 }
@@ -476,31 +559,12 @@ Example:
                       : 'bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-sm'
                   }`}>
                     {msg.isStreaming ? (
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2 text-violet-400">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                          <span className="font-medium">
-                            {msg.agentRole === 'planner' ? 'Составляю план...' :
-                             msg.agentRole === 'coder' ? 'Пишу код...' :
-                             msg.agentRole === 'architect' ? 'Анализирую задачу...' :
-                             'Обрабатываю...'}
-                          </span>
-                        </div>
-                        {getDisplayContent(msg.content) && (
-                          <p className="text-[var(--text-muted)] whitespace-pre-wrap">{getDisplayContent(msg.content)}</p>
-                        )}
-                        <div className="flex gap-1 mt-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-violet-300 animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </div>
-                      </div>
+                      <StreamingBubble role={msg.agentRole} agentName={msg.agentName} content={msg.content} />
                     ) : (
                       <div>
                         <p className="whitespace-pre-wrap">
-                          {displayContent || (appliedFiles.length > 0 ? 'Готово! Изменения применены.' : msg.content)}
+                          {displayContent || (appliedFiles.length > 0 ? '✅ Готово! Все файлы применены в редакторе.' : msg.content)}
                         </p>
-                        {/* Plan items */}
                         {msg.planItems && msg.planItems.length > 0 && (
                           <PlanDisplay items={msg.planItems} />
                         )}
@@ -508,7 +572,7 @@ Example:
                     )}
                   </div>
 
-                  {/* Applied files + preview button */}
+                  {/* Applied files + preview buttons */}
                   {appliedFiles.length > 0 && (
                     <div className="flex flex-wrap gap-1 items-center">
                       <div className="flex items-center gap-1 text-[10px] text-green-400 bg-green-400/10 border border-green-400/20 rounded-full px-2 py-0.5">
@@ -526,6 +590,14 @@ Example:
                       >
                         <Eye className="w-3 h-3" />View Preview
                       </button>
+                      {appliedFiles.includes('package.json') && (
+                        <button
+                          onClick={() => window.dispatchEvent(new CustomEvent('workspace:npmInstall'))}
+                          className="flex items-center gap-1 text-[10px] text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-full px-2.5 py-0.5 hover:bg-blue-400/20 transition-colors font-medium"
+                        >
+                          <Loader2 className="w-3 h-3" />npm install + Preview
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

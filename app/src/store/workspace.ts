@@ -9,8 +9,9 @@ interface WorkspaceState {
   currentProject: Project | null
   activeFile: ProjectFile | null
 
-  // Messages
+  // Messages — persisted per project
   messages: Message[]
+  messagesByProjectId: Record<string, Message[]>
 
   // AI Agents
   agents: AIAgent[]
@@ -119,6 +120,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       currentProject: null,
       activeFile: null,
       messages: [],
+      messagesByProjectId: {},
       agents: [DEFAULT_AGENT],
       activeAgentId: DEFAULT_AGENT.id,
       activePanel: 'editor',
@@ -140,7 +142,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         return project
       },
 
-      setCurrentProject: (project) => set({ currentProject: project, activeFile: project.files[0], messages: [] }),
+      setCurrentProject: (project) => set((s) => ({
+        currentProject: project,
+        activeFile: project.files[0],
+        // Restore this project's messages (filter out streaming state)
+        messages: (s.messagesByProjectId[project.id] || []).map((m) => ({ ...m, isStreaming: false })),
+      })),
 
       setActiveFile: (file) => set({ activeFile: file }),
 
@@ -184,29 +191,62 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       addMessage: (msg) => {
         const id = crypto.randomUUID()
-        set((s) => ({ messages: [...s.messages, { ...msg, id, timestamp: new Date() }] }))
+        set((s) => {
+          const newMsg = { ...msg, id, timestamp: new Date() }
+          const newMessages = [...s.messages, newMsg]
+          const pid = s.currentProject?.id
+          return {
+            messages: newMessages,
+            messagesByProjectId: pid
+              ? { ...s.messagesByProjectId, [pid]: newMessages }
+              : s.messagesByProjectId,
+          }
+        })
         return id
       },
 
       updateMessage: (id, content, isStreaming, planItems) =>
-        set((s) => ({
-          messages: s.messages.map((m) =>
+        set((s) => {
+          const newMessages = s.messages.map((m) =>
             m.id === id
               ? { ...m, content, isStreaming: isStreaming ?? false, ...(planItems !== undefined ? { planItems } : {}) }
               : m
-          ),
-        })),
+          )
+          const pid = s.currentProject?.id
+          return {
+            messages: newMessages,
+            messagesByProjectId: pid
+              ? { ...s.messagesByProjectId, [pid]: newMessages }
+              : s.messagesByProjectId,
+          }
+        }),
 
       updatePlanItem: (messageId, index, done) =>
-        set((s) => ({
-          messages: s.messages.map((m) =>
+        set((s) => {
+          const newMessages = s.messages.map((m) =>
             m.id === messageId && m.planItems
               ? { ...m, planItems: m.planItems.map((p, i) => (i === index ? { ...p, done } : p)) }
               : m
-          ),
-        })),
+          )
+          const pid = s.currentProject?.id
+          return {
+            messages: newMessages,
+            messagesByProjectId: pid
+              ? { ...s.messagesByProjectId, [pid]: newMessages }
+              : s.messagesByProjectId,
+          }
+        }),
 
-      clearMessages: () => set({ messages: [] }),
+      clearMessages: () =>
+        set((s) => {
+          const pid = s.currentProject?.id
+          return {
+            messages: [],
+            messagesByProjectId: pid
+              ? { ...s.messagesByProjectId, [pid]: [] }
+              : s.messagesByProjectId,
+          }
+        }),
 
       addAgent: (agent) => {
         const id = crypto.randomUUID()
@@ -236,7 +276,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
       name: 'ai-builder-workspace',
-      partialize: (s) => ({ projects: s.projects, agents: s.agents, activeAgentId: s.activeAgentId }),
+      partialize: (s) => ({
+        projects: s.projects,
+        agents: s.agents,
+        activeAgentId: s.activeAgentId,
+        messagesByProjectId: s.messagesByProjectId,
+      }),
     }
   )
 )

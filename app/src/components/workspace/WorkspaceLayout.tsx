@@ -91,15 +91,34 @@ export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
     }
   }, [initialPrompt, currentProject])
 
-  // Switch to preview panel from AI chat
+  // Switch to preview from AI chat
   useEffect(() => {
-    const handler = () => {
+    const openPreview = () => { setMobilePanel('preview'); setBottomPanel('preview') }
+    const npmInstall = () => {
       setMobilePanel('preview')
-      setBottomPanel('preview')
+      setBottomPanel('terminal')
+      // Simulate npm install in terminal
+      addTerminalOutput('$ npm install')
+      addTerminalOutput('Installing dependencies...')
+      let t1: ReturnType<typeof setTimeout>
+      let t2: ReturnType<typeof setTimeout>
+      let t3: ReturnType<typeof setTimeout>
+      t1 = setTimeout(() => addTerminalOutput('added 247 packages in 4.2s'), 2000)
+      t2 = setTimeout(() => { addTerminalOutput('$ npm run dev'); addTerminalOutput('Starting dev server...') }, 2500)
+      t3 = setTimeout(() => {
+        addTerminalOutput('✓ Ready on http://localhost:3000')
+        addTerminalOutput('$ ')
+        setBottomPanel('preview')
+      }, 3500)
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
     }
-    window.addEventListener('workspace:openPreview', handler)
-    return () => window.removeEventListener('workspace:openPreview', handler)
-  }, [])
+    window.addEventListener('workspace:openPreview', openPreview)
+    window.addEventListener('workspace:npmInstall', npmInstall)
+    return () => {
+      window.removeEventListener('workspace:openPreview', openPreview)
+      window.removeEventListener('workspace:npmInstall', npmInstall)
+    }
+  }, [addTerminalOutput])
 
   const handleRun = () => {
     addTerminalOutput('$ npm run dev')
