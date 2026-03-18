@@ -52,7 +52,13 @@ export async function createProject(
 
   if (files.length > 0) {
     const { error: filesErr } = await supabase.from('project_files').insert(
-      files.map((f) => ({ ...f, project_id: proj.id, id: undefined }))
+      files.map((f) => ({
+        project_id: proj.id,
+        name: f.name,
+        path: f.path,
+        content: f.content,
+        language: f.language,
+      }))
     )
     if (filesErr) throw filesErr
   }
