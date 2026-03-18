@@ -307,7 +307,6 @@ export default function AIChat() {
   // ─── Code parsing ───────────────────────────────────────────────────────────
 
   const applyCodeChanges = useCallback((content: string): string[] => {
-    const regex = /```(\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g
     const langToFile: Record<string, string> = {
       html: 'index.html', css: 'style.css',
       javascript: 'script.js', js: 'script.js',
@@ -319,9 +318,17 @@ export default function AIChat() {
       html: 'html', css: 'css', js: 'javascript', ts: 'typescript',
       tsx: 'typescript', jsx: 'javascript', py: 'python', json: 'json',
     }
-    let m
+
+    // Truncate absurdly long responses to prevent display loops
+    const MAX_LEN = 80000
+    const safeContent = content.length > MAX_LEN ? content.slice(0, MAX_LEN) : content
+
     const applied: string[] = []
-    while ((m = regex.exec(content)) !== null) {
+
+    // Format 1: markdown code blocks  ```lang:filepath\ncode```
+    const regex = /```(\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g
+    let m
+    while ((m = regex.exec(safeContent)) !== null) {
       const lang = m[1]?.toLowerCase() || ''
       const filePath = m[2]?.trim() || langToFile[lang] || null
       const code = m[3]?.trim()
@@ -336,6 +343,29 @@ export default function AIChat() {
       }
       applied.push(filename)
     }
+
+    // Format 2: JSON objects {"path": "...", "content": "..."}
+    if (applied.length === 0) {
+      const jsonRegex = /\{"path"\s*:\s*"([^"]+)"\s*,\s*"content"\s*:\s*"([\s\S]*?)"\s*\}/g
+      let jm
+      while ((jm = jsonRegex.exec(safeContent)) !== null) {
+        try {
+          const filePath = jm[1]
+          const code = JSON.parse(`"${jm[2].replace(/\n/g, '\\n')}"`)
+          if (!code || !currentProject || !filePath) continue
+          const filename = filePath.split('/').pop() || filePath
+          const ext = filename.split('.').pop()?.toLowerCase() || ''
+          const existing = currentProject.files.find((f) => f.path === filePath || f.name === filename)
+          if (existing) {
+            updateFileContent(existing.id, code)
+          } else {
+            addFile({ name: filename, path: filePath, content: code, language: extMap[ext] || 'plaintext' })
+          }
+          applied.push(filename)
+        } catch { /* invalid JSON escape, skip */ }
+      }
+    }
+
     return applied
   }, [currentProject, updateFileContent, addFile])
 

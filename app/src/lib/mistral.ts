@@ -36,7 +36,7 @@ export async function chatWithAI(request: ChatRequest): Promise<string> {
       const decoder = new TextDecoder()
       let fullContent = ''
 
-      while (true) {
+      outer: while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
@@ -45,13 +45,29 @@ export async function chatWithAI(request: ChatRequest): Promise<string> {
 
         for (const line of lines) {
           const data = line.slice(6)
-          if (data === '[DONE]') continue
+          if (data === '[DONE]') break outer
           try {
             const parsed = JSON.parse(data)
             const content = parsed.choices?.[0]?.delta?.content || ''
             if (content) {
               fullContent += content
               onChunk(content)
+
+              // Stop if response loops (> 60k chars)
+              if (fullContent.length > 60000) {
+                reader.cancel()
+                break outer
+              }
+              // Stop early if we have all 3 files + 3 bullet summary lines
+              const closingBlocks = (fullContent.match(/^```\s*$/gm) || []).length
+              if (closingBlocks >= 6 && fullContent.length > 2000) {
+                const lastClose = fullContent.lastIndexOf('\n```\n')
+                if (lastClose > 0) {
+                  const afterCode = fullContent.slice(lastClose + 5)
+                  const bullets = (afterCode.match(/^[-•*]\s/gm) || []).length
+                  if (bullets >= 3) { reader.cancel(); break outer }
+                }
+              }
             }
           } catch {}
         }
@@ -101,13 +117,13 @@ export function buildSystemPrompt(agent?: AIAgent): string {
 ════════════════════════════════════════
 HARD RULES — NEVER BREAK THESE
 ════════════════════════════════════════
-1. ONLY output: index.html + style.css + script.js (no React, no TypeScript, no frameworks)
+1. ONLY output: index.html + style.css + script.js (no React, no TypeScript, no build tools)
 2. ALWAYS use file blocks: \`\`\`html:index.html  \`\`\`css:style.css  \`\`\`js:script.js
 3. NEVER write plain code in chat. NEVER write ### headers or plan explanations.
-4. NEVER use: #3498db, #2ecc71, #ecf0f1, white backgrounds, or any flat Bootstrap colors
-5. ALL 3 files must be COMPLETE and LONG — no placeholders, no "add your content here", no truncation
-6. After code blocks: write ONLY 3-5 bullet summary of SPECIFIC changes made (e.g. "Added parallax scroll to .hero using translateY", NOT generic phrases).
-7. NAVBAR must be compact (max 64px tall) — never use padding > 12px 24px on nav inner
+4. Use TAILWIND CSS utility classes in HTML for layout/spacing/typography — style.css only for things Tailwind can't do (custom animations, gradients, glassmorphism, pseudo-elements)
+5. ALL 3 files must be COMPLETE — no placeholders, no "add your content here", no truncation
+6. After code blocks: write ONLY 3-5 bullet summary of SPECIFIC changes (e.g. "Added parallax to hero section", NOT generic phrases). STOP after the bullets — never repeat text.
+7. NAVBAR must be compact (height 60px / py-3) — never make it tall
 
 ════════════════════════════════════════
 MANDATORY DESIGN SYSTEM — COPY EXACTLY
@@ -275,12 +291,26 @@ section { padding: 100px 0; }
 }
 
 ════════════════════════════════════════
-HTML CDNs — ALWAYS include ALL of these
+HTML CDNs — ALWAYS include ALL of these in <head>
 ════════════════════════════════════════
+<!-- Tailwind CSS — use utility classes for layout, spacing, typography -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: { accent: '#7c3aed', accent2: '#a855f7' },
+      fontFamily: { inter: ['Inter', 'sans-serif'] },
+    }
+  }
+}
+</script>
+<!-- Fonts & Icons -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<!-- Animations -->
 <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 

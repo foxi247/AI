@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       model: mdl,
       messages,
       stream: Boolean(stream),
-      max_tokens: 32768,
+      max_tokens: 16384,
       temperature: 0.7,
     }
     if (tools?.length) {

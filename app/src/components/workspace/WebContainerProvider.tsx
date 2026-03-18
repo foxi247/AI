@@ -20,89 +20,85 @@ export function useWebContainer() {
   return ctx
 }
 
+// Module-level singleton — WebContainer allows only ONE instance per origin.
+// Storing it outside React prevents re-creation on component re-mount (Strict Mode, HMR).
+let _wcInstance: WebContainer | null = null
+let _bootPromise: Promise<WebContainer | null> | null = null
+
+async function getWebContainer(): Promise<WebContainer | null> {
+  if (_wcInstance) return _wcInstance
+  if (_bootPromise) return _bootPromise
+
+  _bootPromise = (async () => {
+    try {
+      const { WebContainer } = await import('@webcontainer/api')
+      const wc = await WebContainer.boot()
+      _wcInstance = wc
+      return wc
+    } catch (e) {
+      console.error('WebContainer boot failed:', e)
+      _bootPromise = null
+      return null
+    }
+  })()
+
+  return _bootPromise
+}
+
 export default function WebContainerProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
   const [booting, setBooting] = useState(false)
   const [serverUrl, setServerUrl] = useState<string | null>(null)
-  const wcRef = useRef<WebContainer | null>(null)
   const processRef = useRef<WebContainerProcess | null>(null)
   const { currentProject } = useWorkspaceStore()
 
-  const boot = useCallback(async () => {
-    if (wcRef.current || booting) return
+  useEffect(() => {
+    let cancelled = false
     setBooting(true)
-    try {
-      const { WebContainer } = await import('@webcontainer/api')
-      const wc = await WebContainer.boot()
-      wcRef.current = wc
 
-      // Listen for server ready
+    getWebContainer().then((wc) => {
+      if (cancelled || !wc) { setBooting(false); return }
+
       wc.on('server-ready', (port, url) => {
-        console.log(`WebContainer server ready on port ${port}: ${url}`)
-        setServerUrl(url)
+        if (!cancelled) setServerUrl(url)
       })
 
       setReady(true)
-    } catch (e) {
-      console.error('WebContainer boot failed:', e)
-    } finally {
       setBooting(false)
-    }
-  }, [booting])
+    })
 
-  useEffect(() => {
-    boot()
-    return () => {
-      // WebContainer cleanup
-      wcRef.current = null
-    }
-  }, [boot])
+    return () => { cancelled = true }
+  }, [])
 
-  // Mount project files whenever they change
   const writeFiles = useCallback(async () => {
-    if (!wcRef.current || !currentProject) return
+    if (!_wcInstance || !currentProject) return
     const files: Record<string, { file: { contents: string } }> = {}
     for (const f of currentProject.files) {
       files[f.path] = { file: { contents: f.content } }
     }
-    await wcRef.current.mount(files)
+    await _wcInstance.mount(files)
   }, [currentProject])
 
   useEffect(() => {
-    if (ready && currentProject) {
-      writeFiles()
-    }
+    if (ready && currentProject) writeFiles()
   }, [ready, currentProject, writeFiles])
 
   const runCommand = useCallback(async (cmd: string, onOutput: (data: string) => void) => {
-    if (!wcRef.current) {
+    if (!_wcInstance) {
       onOutput('\r\n⚠️  WebContainer not ready\r\n')
       return
     }
+    if (processRef.current) processRef.current.kill()
 
-    // Kill previous process
-    if (processRef.current) {
-      processRef.current.kill()
-    }
-
-    const parts = cmd.split(' ')
-    const command = parts[0]
-    const args = parts.slice(1)
-
+    const [command, ...args] = cmd.split(' ')
     try {
-      const process = await wcRef.current.spawn(command, args, {
+      const process = await _wcInstance.spawn(command, args, {
         env: { PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' },
       })
       processRef.current = process
-
-      process.output.pipeTo(
-        new WritableStream({
-          write(data) { onOutput(data) },
-        })
-      )
-
+      process.output.pipeTo(new WritableStream({ write(data) { onOutput(data) } }))
       await process.exit
-    } catch (e) {
+    } catch {
       onOutput(`\r\nbash: ${command}: command not found\r\n`)
     }
   }, [])
