@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Plus, Zap, Code2, Clock, Globe, Trash2, ExternalLink, LogOut, Search, LayoutGrid } from 'lucide-react'
+import { Plus, Zap, Code2, Clock, Globe, Trash2, ExternalLink, LogOut, Search, LayoutGrid, Shield } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
 import { createProject, deleteProject, getUserProjects } from '@/lib/supabase/db'
@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
   const [userName, setUserName] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [search, setSearch] = useState('')
   const [showNewModal, setShowNewModal] = useState(false)
@@ -52,6 +53,15 @@ export default function DashboardPage() {
       if (!user) { router.push('/auth/login'); return }
       setUserId(user.id)
       setUserName(user.user_metadata?.name || user.email?.split('@')[0] || 'User')
+
+      // Load role from profiles
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      if (profile?.role === 'admin') setIsAdmin(true)
+
       loadProjects(user.id)
     }
     init()
@@ -106,6 +116,12 @@ export default function DashboardPage() {
             <span className="font-bold gradient-text">DevForge AI</span>
           </Link>
           <div className="flex items-center gap-3">
+            {isAdmin && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-600/20 border border-violet-500/40 text-violet-400 text-xs font-semibold">
+                <Shield className="w-3 h-3" />
+                Admin
+              </span>
+            )}
             <span className="text-sm text-[var(--text-muted)]">{userName}</span>
             <button onClick={logout} className="text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors" title="Sign out">
               <LogOut className="w-4 h-4" />
@@ -120,7 +136,9 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-black mb-1">
               Welcome back, <span className="gradient-text">{userName}</span>
             </h1>
-            <p className="text-[var(--text-muted)]">Your projects are saved to the cloud</p>
+            <p className="text-[var(--text-muted)]">
+              {isAdmin ? 'Admin — unlimited projects & AI requests' : 'Your projects are saved to the cloud'}
+            </p>
           </div>
           <Button onClick={() => setShowNewModal(true)} className="gap-2 shrink-0">
             <Plus className="w-4 h-4" />
