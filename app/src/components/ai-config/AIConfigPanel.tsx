@@ -201,10 +201,16 @@ export default function AIConfigPanel({ onClose }: Props) {
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="e.g. GPT-4o, Claude, Gemini..."
+                    placeholder='e.g. GPT-4o, Claude, "open" for free models...'
                     className="w-full bg-[var(--surface-3)] border border-[var(--border)] rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-violet-500 transition-colors"
                   />
                 </div>
+
+                {!search && (
+                  <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">
+                    Tip: type <span className="text-emerald-400 font-medium">open</span> to see free OpenRouter models — no credit card required
+                  </p>
+                )}
 
                 {search && (
                   <div className="mt-1 bg-[var(--surface-3)] border border-[var(--border)] rounded-lg overflow-hidden max-h-40 overflow-y-auto">
@@ -216,11 +222,16 @@ export default function AIConfigPanel({ onClose }: Props) {
                           newAgent.model === m.model ? 'bg-violet-600/20 text-violet-300' : ''
                         }`}
                       >
-                        <div>
+                        <div className="flex items-center gap-2 min-w-0">
                           <span className="font-medium">{m.name}</span>
-                          <span className="text-xs text-[var(--text-muted)] ml-2">{m.provider}</span>
+                          <span className="text-xs text-[var(--text-muted)]">{m.provider}</span>
+                          {'isFree' in m && m.isFree && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold shrink-0">
+                              FREE
+                            </span>
+                          )}
                         </div>
-                        <span className="text-[10px] text-[var(--text-muted)]">{m.model}</span>
+                        <span className="text-[10px] text-[var(--text-muted)] truncate max-w-[140px] ml-2">{m.model}</span>
                       </button>
                     ))}
                     {filteredModels.length === 0 && (
@@ -330,6 +341,17 @@ export default function AIConfigPanel({ onClose }: Props) {
             <p>• The active agent handles your chat messages</p>
             <p>• Agents understand their role and collaborate effectively</p>
             <p>• API keys are stored in your browser only (localStorage)</p>
+          </div>
+
+          <div className="bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-4 text-xs space-y-1">
+            <p className="font-medium text-emerald-400 mb-2 flex items-center gap-1.5">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30">FREE</span>
+              OpenRouter — бесплатные модели
+            </p>
+            <p className="text-[var(--text-muted)]">• Зарегистрируйтесь на <span className="text-emerald-400">openrouter.ai</span> и получите API ключ</p>
+            <p className="text-[var(--text-muted)]">• Ищите <span className="text-emerald-400 font-medium">open</span> в поиске — появятся 12 бесплатных моделей</p>
+            <p className="text-[var(--text-muted)]">• Лучшие: DeepSeek R1, Gemini 2.5 Pro, Llama 4 Maverick, Qwen 2.5 Coder</p>
+            <p className="text-[var(--text-muted)]">• Лимит: ~20 req/min, 200 req/day на бесплатном плане</p>
           </div>
         </div>
       </div>

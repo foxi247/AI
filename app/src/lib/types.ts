@@ -130,6 +130,7 @@ Always provide complete file contents in code blocks with the format:
 }
 
 export const POPULAR_MODELS = [
+  // Paid models
   { provider: 'Mistral', model: 'codestral-latest', name: 'Codestral', baseUrl: 'https://codestral.mistral.ai/v1' },
   { provider: 'Mistral', model: 'mistral-large-latest', name: 'Mistral Large', baseUrl: 'https://api.mistral.ai/v1' },
   { provider: 'OpenAI', model: 'gpt-4o', name: 'GPT-4o', baseUrl: 'https://api.openai.com/v1' },
@@ -138,4 +139,17 @@ export const POPULAR_MODELS = [
   { provider: 'Anthropic', model: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', baseUrl: 'https://api.anthropic.com/v1' },
   { provider: 'Google', model: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
   { provider: 'Groq', model: 'llama-3.1-70b-versatile', name: 'Llama 3.1 70B', baseUrl: 'https://api.groq.com/openai/v1' },
+  // OpenRouter — Free models (requires openrouter.ai API key)
+  { provider: 'OpenRouter', model: 'deepseek/deepseek-r1:free', name: 'DeepSeek R1', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'deepseek/deepseek-chat-v3-0324:free', name: 'DeepSeek V3', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'meta-llama/llama-4-maverick:free', name: 'Llama 4 Maverick', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'meta-llama/llama-4-scout:free', name: 'Llama 4 Scout', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'google/gemini-2.5-pro-exp-03-25:free', name: 'Gemini 2.5 Pro', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'google/gemma-3-27b-it:free', name: 'Gemma 3 27B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'qwen/qwen2.5-coder-32b-instruct:free', name: 'Qwen 2.5 Coder 32B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'nvidia/llama-3.1-nemotron-nano-8b-v1:free', name: 'Nemotron Nano 8B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
+  { provider: 'OpenRouter', model: 'mistralai/devstral-small:free', name: 'Devstral Small', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
 ]
