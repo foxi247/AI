@@ -21,28 +21,29 @@ export function useWebContainer() {
 }
 
 // Module-level singleton — WebContainer allows only ONE instance per origin.
-// Storing it outside React prevents re-creation on component re-mount (Strict Mode, HMR).
-let _wcInstance: WebContainer | null = null
-let _bootPromise: Promise<WebContainer | null> | null = null
+// Storing outside React AND using globalThis prevents reset on HMR/Strict Mode.
+declare global { var __wcInstance: WebContainer | null; var __wcBootPromise: Promise<WebContainer | null> | null }
+if (typeof globalThis.__wcInstance === 'undefined') { globalThis.__wcInstance = null }
+if (typeof globalThis.__wcBootPromise === 'undefined') { globalThis.__wcBootPromise = null }
 
-async function getWebContainer(): Promise<WebContainer | null> {
-  if (_wcInstance) return _wcInstance
-  if (_bootPromise) return _bootPromise
+export async function getWebContainer(): Promise<WebContainer | null> {
+  if (globalThis.__wcInstance) return globalThis.__wcInstance
+  if (globalThis.__wcBootPromise) return globalThis.__wcBootPromise
 
-  _bootPromise = (async () => {
+  globalThis.__wcBootPromise = (async () => {
     try {
       const { WebContainer } = await import('@webcontainer/api')
       const wc = await WebContainer.boot()
-      _wcInstance = wc
+      globalThis.__wcInstance = wc
       return wc
     } catch (e) {
       console.error('WebContainer boot failed:', e)
-      _bootPromise = null
+      globalThis.__wcBootPromise = null
       return null
     }
   })()
 
-  return _bootPromise
+  return globalThis.__wcBootPromise
 }
 
 export default function WebContainerProvider({ children }: { children: ReactNode }) {
@@ -71,12 +72,12 @@ export default function WebContainerProvider({ children }: { children: ReactNode
   }, [])
 
   const writeFiles = useCallback(async () => {
-    if (!_wcInstance || !currentProject) return
+    if (!globalThis.__wcInstance || !currentProject) return
     const files: Record<string, { file: { contents: string } }> = {}
     for (const f of currentProject.files) {
       files[f.path] = { file: { contents: f.content } }
     }
-    await _wcInstance.mount(files)
+    await globalThis.__wcInstance.mount(files)
   }, [currentProject])
 
   useEffect(() => {
@@ -84,7 +85,7 @@ export default function WebContainerProvider({ children }: { children: ReactNode
   }, [ready, currentProject, writeFiles])
 
   const runCommand = useCallback(async (cmd: string, onOutput: (data: string) => void) => {
-    if (!_wcInstance) {
+    if (!globalThis.__wcInstance) {
       onOutput('\r\n⚠️  WebContainer not ready\r\n')
       return
     }
@@ -92,7 +93,7 @@ export default function WebContainerProvider({ children }: { children: ReactNode
 
     const [command, ...args] = cmd.split(' ')
     try {
-      const process = await _wcInstance.spawn(command, args, {
+      const process = await globalThis.__wcInstance.spawn(command, args, {
         env: { PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' },
       })
       processRef.current = process

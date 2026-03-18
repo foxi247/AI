@@ -704,6 +704,20 @@ Just: code blocks → specific summary. Nothing else.`
         if (orchestrated) return
       }
 
+      // Determine mode: chat / surgical-edit / build
+      const isGreeting = GREETING_PATTERNS.some((p) => p.test(content.toLowerCase().trim()))
+      const hasExistingFiles = (currentProject?.files.some((f) => f.content.length > 200)) ?? false
+      const isCreationRequest = ['create','build','make','сделай','создай','разработай','построй','сгенерируй','лендинг','приложение','сайт'].some((k) => content.toLowerCase().includes(k))
+
+      let extraContext = ''
+      if (isGreeting) {
+        extraContext = '\n\n## MODE: CHAT\nThe user sent a greeting or general question. Respond naturally and conversationally in the same language they used. Do NOT output any code or files. Just reply as a helpful AI assistant.'
+      } else if (hasExistingFiles && !isCreationRequest) {
+        // Surgical edit — only change what was asked
+        extraContext = '\n\n## MODE: SURGICAL EDIT\nThe project already has files. Make ONLY the specific change the user requested — nothing more. Output ONLY the file(s) that actually changed. Do not rewrite unrelated files. Do not change anything the user did not mention. After the file block(s), write 1-3 bullets describing EXACTLY what you changed.'
+      }
+      // else: build mode — system prompt defaults apply (output all 3 files)
+
       // Single agent fallback
       const assistantId = addMessage({
         role: 'assistant', content: '',
@@ -711,7 +725,7 @@ Just: code blocks → specific summary. Nothing else.`
         isStreaming: true,
       })
 
-      const full = await callAgent(activeAgent, content, '', (c) => updateMessage(assistantId, c, true))
+      const full = await callAgent(activeAgent, content, extraContext, (c) => updateMessage(assistantId, c, true))
       const applied = applyCodeChanges(full)
       updateMessage(assistantId, full, false)
 

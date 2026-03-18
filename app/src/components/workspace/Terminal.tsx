@@ -110,8 +110,10 @@ function RealTerminal() {
   useEffect(() => {
     const tryBoot = async () => {
       try {
-        const { WebContainer } = await import('@webcontainer/api')
-        const wc = await WebContainer.boot()
+        // Use shared singleton — never call WebContainer.boot() directly here
+        const { getWebContainer } = await import('./WebContainerProvider')
+        const wc = await getWebContainer()
+        if (!wc) throw new Error('WebContainer unavailable')
         runCommandRef.current = async (cmd: string, onData: (d: string) => void) => {
           const parts = cmd.trim().split(/\s+/)
           const proc = await wc.spawn(parts[0], parts.slice(1))

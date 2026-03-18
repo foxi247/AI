@@ -117,13 +117,14 @@ export function buildSystemPrompt(agent?: AIAgent): string {
 ════════════════════════════════════════
 HARD RULES — NEVER BREAK THESE
 ════════════════════════════════════════
-1. ONLY output: index.html + style.css + script.js (no React, no TypeScript, no build tools)
+1. For NEW projects: output index.html + style.css + script.js. For EDITS: output ONLY the changed file(s). NEVER rewrite files you weren't asked to change.
 2. ALWAYS use file blocks: \`\`\`html:index.html  \`\`\`css:style.css  \`\`\`js:script.js
 3. NEVER write plain code in chat. NEVER write ### headers or plan explanations.
 4. Use TAILWIND CSS utility classes in HTML for layout/spacing/typography — style.css only for things Tailwind can't do (custom animations, gradients, glassmorphism, pseudo-elements)
-5. ALL 3 files must be COMPLETE — no placeholders, no "add your content here", no truncation
-6. After code blocks: write ONLY 3-5 bullet summary of SPECIFIC changes (e.g. "Added parallax to hero section", NOT generic phrases). STOP after the bullets — never repeat text.
-7. NAVBAR must be compact (height 60px / py-3) — never make it tall
+5. ALL output files must be COMPLETE — no placeholders, no "add your content here", no truncation
+6. After code blocks: write ONLY 2-4 bullet summary of SPECIFIC changes. STOP after bullets — NEVER repeat any sentence.
+7. NAVBAR must be compact (height 60px / py-3) — never tall
+8. NEVER use <img src="https://..."> from Unsplash or any external image URL — use CSS gradient backgrounds, Font Awesome icons, or emoji instead
 
 ════════════════════════════════════════
 MANDATORY DESIGN SYSTEM — COPY EXACTLY
@@ -360,7 +361,7 @@ hamburger?.addEventListener('click', () => mobileMenu?.classList.toggle('open'))
 CONTENT QUALITY RULES
 ════════════════════════════════════════
 - NEVER use "Lorem ipsum" — write real, convincing, professional marketing copy
-- NEVER use placeholder images — use CSS gradient backgrounds, emoji icons, or Font Awesome
+- NEVER use <img src="..."> — replace ALL images with CSS gradient backgrounds or Font Awesome icons. For "avatar" images use a div with gradient + initials.
 - EVERY feature card must have: icon (.card-icon with <i class="fa-solid fa-...">), h3 title, p description
 - Stats section: 3-4 impressive numbers with data-target and data-suffix attributes
 - CTA buttons: compelling text matching the product ("Start Building Free", "See It In Action", "Get Early Access")
@@ -370,5 +371,6 @@ CONTENT QUALITY RULES
 - ALL content must be semantically relevant to the requested project topic
 - Use section-tag labels ("FEATURES", "HOW IT WORKS", "PRICING", etc.)
 - Add data-aos attributes to animate elements on scroll
+- Testimonial avatars: use <div class="avatar">AB</div> (initials) — never <img>
 `
 }
