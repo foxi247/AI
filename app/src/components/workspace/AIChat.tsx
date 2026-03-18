@@ -57,36 +57,50 @@ export default function AIChat() {
 
   // Parse AI response and apply code changes to editor
   const applyCodeChanges = (content: string): string[] => {
-    const codeBlockRegex = /```(?:\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g
+    // Match both ```lang:path and plain ```lang blocks
+    const codeBlockRegex = /```(\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g
     let match
     const applied: string[] = []
 
-    while ((match = codeBlockRegex.exec(content)) !== null) {
-      const filePath = match[1]?.trim()
-      const code = match[2]?.trim()
+    // Fallback: map language → default filename
+    const langToFile: Record<string, string> = {
+      html: 'index.html', css: 'style.css',
+      javascript: 'script.js', js: 'script.js',
+      typescript: 'script.ts', ts: 'script.ts',
+      python: 'main.py', py: 'main.py',
+      json: 'data.json', markdown: 'README.md', md: 'README.md',
+    }
+    const extMap: Record<string, string> = {
+      html: 'html', css: 'css', js: 'javascript', ts: 'typescript',
+      tsx: 'typescript', jsx: 'javascript', py: 'python', json: 'json', md: 'markdown',
+    }
 
-      if (!filePath || !code || !currentProject) continue
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      const lang = match[1]?.toLowerCase() || ''
+      const filePath = match[2]?.trim() || langToFile[lang] || null
+      const code = match[3]?.trim()
+
+      if (!code || !currentProject) continue
+      if (!filePath) continue
+
+      const filename = filePath.split('/').pop() || filePath
+      const ext = filename.split('.').pop()?.toLowerCase() || ''
 
       const existing = currentProject.files.find(
-        (f) => f.path === filePath || f.name === filePath.split('/').pop()
+        (f) => f.path === filePath || f.name === filename
       )
 
       if (existing) {
         updateFileContent(existing.id, code)
-        applied.push(filePath.split('/').pop() || filePath)
+        applied.push(filename)
       } else {
-        const ext = filePath.split('.').pop()?.toLowerCase() || ''
-        const langMap: Record<string, string> = {
-          html: 'html', css: 'css', js: 'javascript', ts: 'typescript',
-          tsx: 'typescript', jsx: 'javascript', py: 'python', json: 'json', md: 'markdown',
-        }
         addFile({
-          name: filePath.split('/').pop() || filePath,
+          name: filename,
           path: filePath,
           content: code,
-          language: langMap[ext] || 'plaintext',
+          language: extMap[ext] || lang || 'plaintext',
         })
-        applied.push(filePath.split('/').pop() || filePath)
+        applied.push(filename)
       }
     }
 
