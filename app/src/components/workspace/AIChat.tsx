@@ -466,6 +466,7 @@ export default function AIChat() {
           try { msg = JSON.parse(raw)?.error || raw } catch { /* keep raw */ }
           const isDataPolicy = msg.includes('guardrail') || msg.includes('data policy') || msg.includes('No endpoints available') || msg.includes('provider requires')
           if (isDataPolicy) msg = '⚠️ Модель требует разрешения Data Policy.\nОткройте https://openrouter.ai/settings/privacy и разрешите использование данных.'
+          else if (msg.includes('Provider returned error')) msg = `⚠️ Провайдер модели недоступен — попробуйте другую модель.\n${msg}`
           else if (res.status === 429) msg = `⚠️ Rate limited — подождите немного и попробуйте снова\n${msg}`
           else if (res.status === 404) msg = `⚠️ Модель недоступна: ${msg}`
           updateMessage(msgId, `❌ ${msg}`, false)
