@@ -12,11 +12,19 @@ export interface AIAgent {
   systemPrompt?: string
 }
 
+export interface PlanItem {
+  text: string
+  done: boolean
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   agentId?: string
+  agentName?: string
+  agentRole?: AIRole
+  planItems?: PlanItem[]
   timestamp: Date
   isStreaming?: boolean
 }

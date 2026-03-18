@@ -31,7 +31,8 @@ interface WorkspaceState {
   deleteFile: (fileId: string) => void
 
   addMessage: (msg: Omit<Message, 'id' | 'timestamp'>) => string
-  updateMessage: (id: string, content: string, isStreaming?: boolean) => void
+  updateMessage: (id: string, content: string, isStreaming?: boolean, planItems?: import('@/lib/types').PlanItem[]) => void
+  updatePlanItem: (messageId: string, index: number, done: boolean) => void
   clearMessages: () => void
 
   addAgent: (agent: Omit<AIAgent, 'id'>) => void
@@ -187,9 +188,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         return id
       },
 
-      updateMessage: (id, content, isStreaming) =>
+      updateMessage: (id, content, isStreaming, planItems) =>
         set((s) => ({
-          messages: s.messages.map((m) => (m.id === id ? { ...m, content, isStreaming: isStreaming ?? false } : m)),
+          messages: s.messages.map((m) =>
+            m.id === id
+              ? { ...m, content, isStreaming: isStreaming ?? false, ...(planItems !== undefined ? { planItems } : {}) }
+              : m
+          ),
+        })),
+
+      updatePlanItem: (messageId, index, done) =>
+        set((s) => ({
+          messages: s.messages.map((m) =>
+            m.id === messageId && m.planItems
+              ? { ...m, planItems: m.planItems.map((p, i) => (i === index ? { ...p, done } : p)) }
+              : m
+          ),
         })),
 
       clearMessages: () => set({ messages: [] }),
