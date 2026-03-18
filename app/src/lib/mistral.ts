@@ -1,7 +1,5 @@
 import { AIAgent, Message } from './types'
 
-const DEFAULT_MISTRAL_API_KEY = 'Ra3flT4bkJdLOkh0OoNRkEVhz1byTlaU'
-const DEFAULT_BASE_URL = 'https://codestral.mistral.ai/v1'
 const DEFAULT_MODEL = 'codestral-latest'
 
 export interface ChatRequest {
@@ -13,26 +11,19 @@ export interface ChatRequest {
 export async function chatWithAI(request: ChatRequest): Promise<string> {
   const { messages, agent, onChunk } = request
 
-  const apiKey = agent?.apiKey || DEFAULT_MISTRAL_API_KEY
-  const baseUrl = agent?.baseUrl || DEFAULT_BASE_URL
-  const model = agent?.model || DEFAULT_MODEL
-
-  const url = `${baseUrl}/chat/completions`
+  const body: Record<string, unknown> = {
+    messages,
+    model: agent?.model || DEFAULT_MODEL,
+    stream: Boolean(onChunk),
+  }
+  if (agent?.apiKey) body.apiKey = agent.apiKey
+  if (agent?.baseUrl) body.baseUrl = agent.baseUrl
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch('/api/ai', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: Boolean(onChunk),
-        max_tokens: 4096,
-        temperature: 0.7,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     })
 
     if (!response.ok) {

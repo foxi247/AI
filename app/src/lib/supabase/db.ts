@@ -35,6 +35,11 @@ export async function createProject(
 ) {
   const supabase = createClient()
 
+  // Ensure profile exists (in case trigger didn't fire on signup)
+  await supabase
+    .from('profiles')
+    .upsert({ id: userId, role: 'user' }, { onConflict: 'id', ignoreDuplicates: true })
+
   const { data: proj, error: projErr } = await supabase
     .from('projects')
     .insert({ user_id: userId, name, description })

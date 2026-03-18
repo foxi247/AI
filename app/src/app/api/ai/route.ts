@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const DEFAULT_API_KEY = 'Ra3flT4bkJdLOkh0OoNRkEVhz1byTlaU'
+const DEFAULT_API_KEY = 'xIUUS0W8ht9Wgl0pZqKPFqmzMkYXvzqx'
 const DEFAULT_BASE_URL = 'https://codestral.mistral.ai/v1'
 const DEFAULT_MODEL = 'codestral-latest'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { messages, model, apiKey, baseUrl } = body
+    const { messages, model, apiKey, baseUrl, stream } = body
 
     const url = `${baseUrl || DEFAULT_BASE_URL}/chat/completions`
     const key = apiKey || DEFAULT_API_KEY
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: mdl,
         messages,
-        stream: false,
+        stream: Boolean(stream),
         max_tokens: 4096,
         temperature: 0.7,
       }),
@@ -31,6 +31,17 @@ export async function POST(req: NextRequest) {
     if (!response.ok) {
       const error = await response.text()
       return NextResponse.json({ error }, { status: response.status })
+    }
+
+    // Proxy streaming response directly
+    if (stream && response.body) {
+      return new Response(response.body, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'X-Accel-Buffering': 'no',
+        },
+      })
     }
 
     const data = await response.json()
