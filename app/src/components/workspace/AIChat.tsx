@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Send, Bot, User, Settings, RotateCcw, Sparkles,
   FileCode, CheckCircle2, Loader2, Eye, Circle,
-  BrainCircuit, Code2, PenTool, Search
+  BrainCircuit, Code2, PenTool, Search, Download
 } from 'lucide-react'
 import { useWorkspaceStore } from '@/store/workspace'
 import { AI_ROLES, AIRole, PlanItem } from '@/lib/types'
@@ -430,6 +430,34 @@ Example:
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   }
 
+  const handleDownload = () => {
+    const projectName = currentProject?.name || 'chat'
+    const date = new Date().toISOString().slice(0, 10)
+
+    // Build readable text
+    const text = messages
+      .filter((m) => m.role !== 'system')
+      .map((m) => {
+        const who = m.role === 'user' ? '👤 Вы' : `🤖 ${m.agentName || activeAgent?.name || 'AI'}`
+        const time = new Date(m.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+        const body = getDisplayContent(m.content) || m.content
+        const plan = m.planItems?.length
+          ? '\n\nПлан:\n' + m.planItems.map((p, i) => `  ${p.done ? '✅' : '☐'} ${i + 1}. ${p.text}`).join('\n')
+          : ''
+        return `[${time}] ${who}\n${'─'.repeat(40)}\n${body}${plan}\n`
+      })
+      .join('\n')
+
+    const full = `Чат: ${projectName}\nДата: ${date}\n${'═'.repeat(50)}\n\n${text}`
+    const blob = new Blob([full], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `chat-${projectName}-${date}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
@@ -486,9 +514,14 @@ Example:
           </div>
           <div className="flex items-center gap-1">
             {messages.length > 0 && (
-              <button onClick={clearMessages} className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-3)] transition-colors">
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
+              <>
+                <button onClick={handleDownload} className="p-1.5 rounded text-[var(--text-muted)] hover:text-green-400 hover:bg-green-600/10 transition-colors" title="Скачать чат">
+                  <Download className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={clearMessages} className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-3)] transition-colors" title="Очистить чат">
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </>
             )}
             <button onClick={() => setShowConfig(true)} className="p-1.5 rounded text-[var(--text-muted)] hover:text-violet-400 hover:bg-violet-600/10 transition-colors">
               <Settings className="w-3.5 h-3.5" />
