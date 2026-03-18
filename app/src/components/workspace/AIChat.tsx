@@ -29,6 +29,16 @@ export default function AIChat() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Listen for prompt events from WorkspaceLayout (initial prompt from URL)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const prompt = (e as CustomEvent<string>).detail
+      if (prompt) sendMessage(prompt)
+    }
+    window.addEventListener('ai:sendPrompt', handler)
+    return () => window.removeEventListener('ai:sendPrompt', handler)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const activeAgent = agents.find((a) => a.id === activeAgentId) || agents[0]
   const roleInfo = activeAgent ? AI_ROLES[activeAgent.role] : AI_ROLES.fullstack
 

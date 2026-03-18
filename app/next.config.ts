@@ -1,7 +1,24 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  // Required for @webcontainer/api to work
+  // These headers enable SharedArrayBuffer and cross-origin isolation
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
+        ],
+      },
+    ]
+  },
 
-export default nextConfig;
+  // Allow WebContainer iframes
+  async rewrites() {
+    return []
+  },
+}
+
+export default nextConfig

@@ -1,14 +1,22 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Plus, Zap, Code2, Clock, Globe, Trash2, ExternalLink, LogOut, Search, LayoutGrid } from 'lucide-react'
 import Button from '@/components/ui/Button'
+import { createClient } from '@/lib/supabase/client'
+import { createProject, deleteProject, getUserProjects } from '@/lib/supabase/db'
 import { useWorkspaceStore } from '@/store/workspace'
 import { Project } from '@/lib/types'
 
+const DEFAULT_FILES = [
+  { name: 'index.html', path: 'index.html', language: 'html', content: `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>My App</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <div class="container">\n    <h1>✨ Hello, World!</h1>\n    <p>Start by describing what you want to build in the AI chat →</p>\n  </div>\n  <script src="script.js"></script>\n</body>\n</html>` },
+  { name: 'style.css', path: 'style.css', language: 'css', content: `body {\n  font-family: system-ui, sans-serif;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  min-height: 100vh;\n  margin: 0;\n  background: #0a0a0f;\n  color: #e8e8f0;\n}\n\n.container { text-align: center; }\nh1 { font-size: 2.5rem; margin-bottom: 1rem; }\np { color: #6b6b8a; }` },
+  { name: 'script.js', path: 'script.js', language: 'javascript', content: `// Your JavaScript here\nconsole.log('App started');` },
+]
+
 const TEMPLATES = [
-  { name: 'Todo App', desc: 'Simple task manager with dark mode', icon: '✅', prompt: 'Create a beautiful todo app with dark mode, animations, and local storage persistence' },
+  { name: 'Todo App', desc: 'Task manager with dark mode', icon: '✅', prompt: 'Create a beautiful todo app with dark mode, animations, and local storage persistence' },
   { name: 'Landing Page', desc: 'Modern SaaS landing page', icon: '🚀', prompt: 'Create a modern SaaS landing page with hero section, features, pricing, and contact form' },
   { name: 'Dashboard', desc: 'Analytics dashboard with charts', icon: '📊', prompt: 'Create an analytics dashboard with charts, stats cards, and a sidebar navigation' },
   { name: 'Chat App', desc: 'Real-time chat interface', icon: '💬', prompt: 'Create a chat app UI with message bubbles, emoji support, and smooth animations' },
@@ -16,25 +24,55 @@ const TEMPLATES = [
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userName, setUserName] = useState('')
+  const [projects, setProjects] = useState<Project[]>([])
   const [search, setSearch] = useState('')
   const [showNewModal, setShowNewModal] = useState(false)
   const [newName, setNewName] = useState('')
-  const { projects, createProject, setCurrentProject } = useWorkspaceStore()
+  const [creating, setCreating] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const { setCurrentProject } = useWorkspaceStore()
+
+  const loadProjects = useCallback(async (uid: string) => {
+    try {
+      const data = await getUserProjects(uid)
+      setProjects(data)
+    } catch (e) {
+      console.error('Failed to load projects:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const u = localStorage.getItem('auth_user')
-    if (!u) { router.push('/auth/login'); return }
-    setUser(JSON.parse(u))
-  }, [router])
+    const init = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/auth/login'); return }
+      setUserId(user.id)
+      setUserName(user.user_metadata?.name || user.email?.split('@')[0] || 'User')
+      loadProjects(user.id)
+    }
+    init()
+  }, [router, loadProjects])
 
-  const filtered = projects.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
-
-  const handleCreate = (name: string = newName || 'My App') => {
-    const p = createProject(name)
-    setShowNewModal(false)
-    setNewName('')
-    router.push(`/workspace/${p.id}`)
+  const handleCreate = async (name: string = newName || 'My App', description = '', prompt = '') => {
+    if (!userId) return
+    setCreating(true)
+    try {
+      const p = await createProject(userId, name, description, DEFAULT_FILES)
+      setProjects((prev) => [p, ...prev])
+      setShowNewModal(false)
+      setNewName('')
+      setCurrentProject(p)
+      const url = `/workspace/${p.id}${prompt ? `?prompt=${encodeURIComponent(prompt)}` : ''}`
+      router.push(url)
+    } catch (e) {
+      console.error('Failed to create project:', e)
+    } finally {
+      setCreating(false)
+    }
   }
 
   const handleOpen = (p: Project) => {
@@ -42,16 +80,23 @@ export default function DashboardPage() {
     router.push(`/workspace/${p.id}`)
   }
 
-  const logout = () => {
-    localStorage.removeItem('auth_user')
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!confirm('Delete this project?')) return
+    await deleteProject(id)
+    setProjects((prev) => prev.filter((p) => p.id !== id))
+  }
+
+  const logout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
     router.push('/')
   }
 
-  if (!user) return null
+  const filtered = projects.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      {/* Top bar */}
       <header className="glass border-b border-[var(--border)] sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
@@ -61,10 +106,8 @@ export default function DashboardPage() {
             <span className="font-bold gradient-text">DevForge AI</span>
           </Link>
           <div className="flex items-center gap-3">
-            <div className="text-sm text-[var(--text-muted)]">
-              {user.name}
-            </div>
-            <button onClick={logout} className="text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors">
+            <span className="text-sm text-[var(--text-muted)]">{userName}</span>
+            <button onClick={logout} className="text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors" title="Sign out">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -72,13 +115,12 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-10">
-        {/* Welcome */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
           <div>
             <h1 className="text-3xl font-black mb-1">
-              Welcome back, <span className="gradient-text">{user.name}</span>
+              Welcome back, <span className="gradient-text">{userName}</span>
             </h1>
-            <p className="text-[var(--text-muted)]">Your projects and workspace</p>
+            <p className="text-[var(--text-muted)]">Your projects are saved to the cloud</p>
           </div>
           <Button onClick={() => setShowNewModal(true)} className="gap-2 shrink-0">
             <Plus className="w-4 h-4" />
@@ -86,8 +128,8 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        {/* Templates */}
-        {projects.length === 0 && (
+        {/* Templates (shown when no projects) */}
+        {!loading && projects.length === 0 && (
           <div className="mb-12">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
               <LayoutGrid className="w-4 h-4 text-violet-400" />
@@ -97,11 +139,8 @@ export default function DashboardPage() {
               {TEMPLATES.map((t) => (
                 <button
                   key={t.name}
-                  onClick={() => {
-                    const p = createProject(t.name, t.desc)
-                    router.push(`/workspace/${p.id}?prompt=${encodeURIComponent(t.prompt)}`)
-                  }}
-                  className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 text-left hover:border-violet-500/50 hover:bg-[var(--surface-2)] transition-all group"
+                  onClick={() => handleCreate(t.name, t.desc, t.prompt)}
+                  className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 text-left hover:border-violet-500/50 hover:bg-[var(--surface-2)] transition-all"
                 >
                   <div className="text-3xl mb-3">{t.icon}</div>
                   <div className="font-semibold text-sm mb-1">{t.name}</div>
@@ -117,7 +156,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold flex items-center gap-2">
               <Code2 className="w-4 h-4 text-violet-400" />
-              Your Projects ({projects.length})
+              Your Projects {!loading && `(${projects.length})`}
             </h2>
             {projects.length > 0 && (
               <div className="relative">
@@ -125,14 +164,24 @@ export default function DashboardPage() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search projects..."
+                  placeholder="Search..."
                   className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-violet-500 transition-colors"
                 />
               </div>
             )}
           </div>
 
-          {projects.length === 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 animate-pulse">
+                  <div className="w-10 h-10 rounded-lg bg-[var(--surface-3)] mb-3" />
+                  <div className="h-4 bg-[var(--surface-3)] rounded w-3/4 mb-2" />
+                  <div className="h-3 bg-[var(--surface-3)] rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : projects.length === 0 ? (
             <div className="bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-2xl p-16 text-center">
               <div className="text-5xl mb-4">🚀</div>
               <h3 className="font-bold text-lg mb-2">No projects yet</h3>
@@ -145,19 +194,20 @@ export default function DashboardPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filtered.map((p) => (
-                <div key={p.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 hover:border-violet-500/40 transition-all group">
+                <div key={p.id} className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 hover:border-violet-500/40 transition-all group cursor-pointer" onClick={() => handleOpen(p)}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-600/30 to-purple-600/20 border border-violet-500/30 flex items-center justify-center">
                       <Code2 className="w-5 h-5 text-violet-400" />
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {p.deployUrl && (
-                        <a href={p.deployUrl} target="_blank" rel="noopener noreferrer"
+                        <a href={p.deployUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
                           className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)] hover:text-green-400 transition-colors">
                           <Globe className="w-3.5 h-3.5" />
                         </a>
                       )}
-                      <button className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)] hover:text-red-400 transition-colors">
+                      <button onClick={(e) => handleDelete(e, p.id)}
+                        className="p-1.5 rounded-lg hover:bg-[var(--surface-2)] text-[var(--text-muted)] hover:text-red-400 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -171,18 +221,13 @@ export default function DashboardPage() {
                       <Clock className="w-3 h-3" />
                       {new Date(p.updatedAt).toLocaleDateString()}
                     </div>
-                    <button
-                      onClick={() => handleOpen(p)}
-                      className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors"
-                    >
-                      Open
-                      <ExternalLink className="w-3 h-3" />
-                    </button>
+                    <span className="flex items-center gap-1 text-xs text-violet-400">
+                      Open <ExternalLink className="w-3 h-3" />
+                    </span>
                   </div>
                 </div>
               ))}
 
-              {/* Add new card */}
               <button
                 onClick={() => setShowNewModal(true)}
                 className="border border-dashed border-[var(--border)] rounded-xl p-5 hover:border-violet-500/50 hover:bg-[var(--surface)] transition-all flex flex-col items-center justify-center gap-2 text-[var(--text-muted)] hover:text-violet-400 min-h-[140px]"
@@ -217,15 +262,10 @@ export default function DashboardPage() {
               <div className="text-sm font-medium mb-2 text-[var(--text-muted)]">Or start from template</div>
               <div className="grid grid-cols-2 gap-2">
                 {TEMPLATES.map((t) => (
-                  <button
-                    key={t.name}
-                    onClick={() => {
-                      const p = createProject(t.name, t.desc)
-                      setShowNewModal(false)
-                      router.push(`/workspace/${p.id}?prompt=${encodeURIComponent(t.prompt)}`)
-                    }}
-                    className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg p-3 text-left hover:border-violet-500/40 transition-colors text-xs"
-                  >
+                  <button key={t.name}
+                    onClick={() => handleCreate(t.name, t.desc, t.prompt)}
+                    disabled={creating}
+                    className="bg-[var(--surface-2)] border border-[var(--border)] rounded-lg p-3 text-left hover:border-violet-500/40 transition-colors text-xs disabled:opacity-50">
                     <span className="mr-1">{t.icon}</span> {t.name}
                   </button>
                 ))}
@@ -234,9 +274,9 @@ export default function DashboardPage() {
 
             <div className="flex gap-3">
               <Button variant="secondary" className="flex-1" onClick={() => setShowNewModal(false)}>Cancel</Button>
-              <Button className="flex-1" onClick={() => handleCreate()}>
+              <Button className="flex-1" onClick={() => handleCreate()} loading={creating}>
                 <Plus className="w-4 h-4" />
-                Create Project
+                Create
               </Button>
             </div>
           </div>
