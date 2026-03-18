@@ -149,6 +149,7 @@ export async function POST(req: NextRequest) {
         message = parsed?.error?.message || parsed?.message || parsed?.error || raw
       } catch { /* keep raw */ }
       const status = response.status
+      console.error(`[AI route] OpenRouter error status=${status} message=${message}`)
       return NextResponse.json({ error: message }, { status })
     }
 

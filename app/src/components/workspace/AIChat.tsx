@@ -464,8 +464,8 @@ export default function AIChat() {
           const raw = await res.text()
           let msg = raw
           try { msg = JSON.parse(raw)?.error || raw } catch { /* keep raw */ }
-          if (res.status === 429) msg = '⚠️ Rate limited — подождите немного и попробуйте снова'
-          else if (msg.includes('guardrail') || msg.includes('data policy')) msg = '⚠️ Модель требует разрешения Data Policy.\nОткройте https://openrouter.ai/settings/privacy и разрешите использование данных.'
+          if (msg.includes('guardrail') || msg.includes('data policy')) msg = '⚠️ Модель требует разрешения Data Policy.\nОткройте https://openrouter.ai/settings/privacy и разрешите использование данных.'
+          else if (res.status === 429) msg = '⚠️ Rate limited — подождите немного и попробуйте снова'
           else if (res.status === 404) msg = `⚠️ Модель недоступна: ${msg}`
           updateMessage(msgId, `❌ ${msg}`, false)
           return true
