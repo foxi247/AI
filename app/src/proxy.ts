@@ -5,7 +5,10 @@ export async function proxy(request: NextRequest) {
   // If Supabase env vars are missing, skip auth middleware entirely
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !supabaseKey) {
+  const isValidUrl = (url: string) => {
+    try { return ['http:', 'https:'].includes(new URL(url).protocol) } catch { return false }
+  }
+  if (!supabaseUrl || !supabaseKey || !isValidUrl(supabaseUrl)) {
     return NextResponse.next({ request })
   }
 
