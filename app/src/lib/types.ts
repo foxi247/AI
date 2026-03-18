@@ -140,6 +140,7 @@ export const POPULAR_MODELS = [
   { provider: 'Google', model: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
   { provider: 'Groq', model: 'llama-3.1-70b-versatile', name: 'Llama 3.1 70B', baseUrl: 'https://api.groq.com/openai/v1' },
   // OpenRouter — Free models (verified via API 2026-03-18, requires openrouter.ai key)
+  { provider: 'OpenRouter', model: 'minimax/minimax-m2.5:free', name: 'MiniMax M2.5', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'qwen/qwen3-coder:free', name: 'Qwen3 Coder 480B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'qwen/qwen3-next-80b-a3b-instruct:free', name: 'Qwen3 Next 80B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'qwen/qwen3-4b:free', name: 'Qwen3 4B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },

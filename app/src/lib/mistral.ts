@@ -32,6 +32,8 @@ export async function chatWithAI(request: ChatRequest): Promise<string> {
       try { message = JSON.parse(raw)?.error || raw } catch { /* keep raw */ }
       const status = response.status
       if (status === 429) throw new Error(`⚠️ Rate limited — подождите немного и попробуйте снова`)
+      if (message.includes('guardrail') || message.includes('data policy'))
+        throw new Error(`⚠️ Модель требует разрешения Data Policy в OpenRouter.\nОткройте https://openrouter.ai/settings/privacy и разрешите использование данных.`)
       if (status === 404) throw new Error(`⚠️ Модель недоступна: ${message}`)
       throw new Error(`AI ошибка ${status}: ${message}`)
     }
