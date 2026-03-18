@@ -22,6 +22,7 @@ interface WorkspaceState {
   terminalOutput: string[]
   isGenerating: boolean
   previewHtml: string
+  agentMode: boolean
 
   // Actions
   createProject: (name: string, description?: string) => Project
@@ -46,6 +47,7 @@ interface WorkspaceState {
   clearTerminal: () => void
   setIsGenerating: (v: boolean) => void
   setPreviewHtml: (html: string) => void
+  setAgentMode: (v: boolean) => void
 }
 
 const DEFAULT_FILES: ProjectFile[] = [
@@ -127,6 +129,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       terminalOutput: ['Welcome to AI Builder Terminal', '$ '],
       isGenerating: false,
       previewHtml: '',
+      agentMode: false,
 
       createProject: (name, description = '') => {
         const project: Project = {
@@ -277,6 +280,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setIsGenerating: (v) => set({ isGenerating: v }),
 
       setPreviewHtml: (html) => set({ previewHtml: html }),
+
+      setAgentMode: (v) => set({ agentMode: v }),
     }),
     {
       name: 'ai-builder-workspace',
@@ -285,6 +290,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         agents: s.agents,
         activeAgentId: s.activeAgentId,
         messagesByProjectId: s.messagesByProjectId,
+        agentMode: s.agentMode,
       }),
     }
   )

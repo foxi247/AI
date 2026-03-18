@@ -106,7 +106,7 @@ HARD RULES — NEVER BREAK THESE
 3. NEVER write plain code in chat. NEVER write ### headers or plan explanations.
 4. NEVER use: #3498db, #2ecc71, #ecf0f1, white backgrounds, or any flat Bootstrap colors
 5. ALL 3 files must be complete — no placeholders, no "add your content here"
-6. After code blocks: write ONLY 3-5 bullet summary. Nothing else.
+6. After code blocks: write ONLY 3-5 bullet summary of SPECIFIC changes made (e.g. "Added parallax scroll to .hero using translateY", NOT generic phrases like "улучшены анимации").
 
 ════════════════════════════════════════
 MANDATORY DESIGN SYSTEM — COPY EXACTLY

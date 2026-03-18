@@ -28,9 +28,14 @@ function getAppliedFiles(content: string): string[] {
 }
 
 const BUILD_KEYWORDS = [
+  // create
   'create','build','make','develop','generate','design',
   'сделай','создай','разработай','построй','сгенерируй',
   'сайт','приложение','лендинг','страницу','проект','систему',
+  // modify / fix
+  'add','fix','update','change','modify','remove','delete','restore','improve','optimize','refactor','revert',
+  'добавь','добавить','измени','исправь','поправь','убери','удали','верни','замени','переделай',
+  'адаптируй','оптимизируй','улучши','обнови','поработай','доработай','сделать',
 ]
 const GREETING_PATTERNS = [
   /^(привет|хай|хэй|hello|hi|hey|sup|yo)[\s!.]*$/i,
@@ -41,8 +46,6 @@ const GREETING_PATTERNS = [
 
 function isBuildRequest(text: string): boolean {
   const lower = text.toLowerCase().trim()
-  // Short messages or greetings = NOT a build request
-  if (lower.split(/\s+/).length < 4) return false
   if (GREETING_PATTERNS.some((p) => p.test(lower))) return false
   return BUILD_KEYWORDS.some((k) => lower.includes(k))
 }
@@ -277,11 +280,11 @@ export default function AIChat() {
     currentProject, activeFile,
     updateFileContent, addFile, deleteFile, setIsGenerating, isGenerating,
     addTerminalOutput,
+    agentMode, setAgentMode,
   } = useWorkspaceStore()
 
   const [input, setInput] = useState('')
   const [showConfig, setShowConfig] = useState(false)
-  const [agentMode, setAgentMode] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -496,7 +499,7 @@ export default function AIChat() {
     const systemPrompt = buildSystemPrompt(agent)
     const projectContext = currentProject
       ? `\n\nProject: "${currentProject.name}"\nFiles:\n${currentProject.files.map((f) =>
-          `--- ${f.path} ---\n${f.content.slice(0, 400)}${f.content.length > 400 ? '...' : ''}`
+          `--- ${f.path} ---\n${f.content.slice(0, 6000)}${f.content.length > 6000 ? '\n...(truncated)' : ''}`
         ).join('\n\n')}`
       : ''
     let full = ''
@@ -594,11 +597,23 @@ Example:
       isStreaming: true,
     })
 
+    const currentFiles = currentProject?.files
+      .filter((f) => f.content.length > 50)
+      .map((f) => `--- ${f.path} ---\n${f.content}`)
+      .join('\n\n') || ''
+
+    const hasExistingContent = currentProject?.files.some((f) => f.content.length > 200) ?? false
+
     const coderSystemEnforcement = `\n\n## THIS IS CRITICAL — READ BEFORE RESPONDING:
 ONLY output the 3 file blocks (index.html, style.css, script.js) + a short 3-5 bullet summary.
 DO NOT write any markdown headers, explanations, step descriptions, or plan recaps.
 DO NOT write React, TypeScript, or component files.
-Just: code blocks → brief summary. Nothing else.`
+After code blocks: write 3-5 bullets describing SPECIFICALLY what was changed (e.g. "Added parallax scroll effect to .hero section", not generic phrases).
+Just: code blocks → specific summary. Nothing else.`
+
+    const coderUserContent = hasExistingContent
+      ? `Modify the EXISTING website to: ${userContent}\n\nPlan:\n${planContent}\n\nCURRENT FILES — keep everything that's good, only change what's needed:\n${currentFiles}\n\nOutput the complete modified files + specific summary of what changed.`
+      : `Build this completely: ${userContent}\n\nPlan:\n${planContent}\n\nGenerate ONLY index.html + style.css + script.js. No React. No explanations. Just the files + specific summary.`
 
     let coderContent = ''
     await chatWithAI({
@@ -606,7 +621,7 @@ Just: code blocks → brief summary. Nothing else.`
         { role: 'system', content: buildSystemPrompt(coder) + coderSystemEnforcement },
         {
           role: 'user',
-          content: `Build this completely: ${userContent}\n\nPlan:\n${planContent}\n\nGenerate ONLY index.html + style.css + script.js. No React. No explanations. Just the files + short summary.`,
+          content: coderUserContent,
         },
       ],
       agent: coder,
@@ -770,7 +785,7 @@ Just: code blocks → brief summary. Nothing else.`
           <div className="flex items-center gap-1">
             {/* Agent Mode Toggle */}
             <button
-              onClick={() => setAgentMode((v) => !v)}
+              onClick={() => setAgentMode(!agentMode)}
               title={agentMode ? 'Agent Mode ON — click to disable' : 'Enable Agent Mode (tool use)'}
               className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
                 agentMode
