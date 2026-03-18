@@ -30,12 +30,12 @@ export default function LivePreview() {
 
     let html = htmlFile?.content || '<!DOCTYPE html><html><head></head><body></body></html>'
 
-    // Remove external CSS/JS links — they don't resolve in blob URL context
-    html = html.replace(/<link[^>]+rel=["']stylesheet["'][^>]*>/gi, '')
-    html = html.replace(/<link[^>]+\.css[^>]*>/gi, '')
-    html = html.replace(/<script[^>]+src=["'][^"']*\.js["'][^>]*><\/script>/gi, '')
+    // Remove only LOCAL (relative) CSS links — keep CDN links (Font Awesome, Google Fonts, AOS, etc.)
+    html = html.replace(/<link\b[^>]*\bhref=["'](?!https?:\/\/)[^"']*\.css["'][^>]*\/?>/gi, '')
+    // Remove only LOCAL JS scripts — keep CDN scripts (AOS, etc.)
+    html = html.replace(/<script\b[^>]*\bsrc=["'](?!https?:\/\/)[^"']*\.js["'][^>]*><\/script>/gi, '')
 
-    // Inline all CSS files
+    // Inline all local CSS files
     if (cssFiles.length > 0) {
       const allCss = cssFiles.map((f) => f.content).join('\n')
       if (html.includes('</head>')) {
@@ -45,7 +45,7 @@ export default function LivePreview() {
       }
     }
 
-    // Inline all JS files
+    // Inline all local JS files
     if (jsFiles.length > 0) {
       const allJs = jsFiles.map((f) => f.content).join('\n')
       if (html.includes('</body>')) {
