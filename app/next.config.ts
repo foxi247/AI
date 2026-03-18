@@ -1,23 +1,18 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  // Required for @webcontainer/api to work
-  // These headers enable SharedArrayBuffer and cross-origin isolation
+  // COOP/COEP headers only on /workspace — required by WebContainers
+  // Applying globally breaks Supabase auth and external resources
   async headers() {
     return [
       {
-        source: '/(.*)',
+        source: '/workspace/:path*',
         headers: [
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
           { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
         ],
       },
     ]
-  },
-
-  // Allow WebContainer iframes
-  async rewrites() {
-    return []
   },
 }
 
