@@ -9,7 +9,7 @@ import { useWorkspaceStore } from '@/store/workspace'
 import {
   Eye, Terminal as TermIcon, Play, Globe, Zap, ChevronLeft,
   Rocket, PanelLeft, Save, X, ExternalLink, Copy, Check,
-  Code2, Bot, FolderOpen, MonitorPlay, ChevronRight
+  Code2, Bot, FolderOpen, MonitorPlay, ChevronRight, Download
 } from 'lucide-react'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
@@ -155,6 +155,22 @@ export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleDownloadZip = async () => {
+    if (!currentProject?.files?.length) return
+    const JSZip = (await import('jszip')).default
+    const zip = new JSZip()
+    for (const file of currentProject.files) {
+      zip.file(file.path || file.name, file.content)
+    }
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${(currentProject.name || 'project').toLowerCase().replace(/\s+/g, '-')}.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (!currentProject) {
     return (
       <div className="h-[100dvh] flex items-center justify-center bg-[var(--background)]">
@@ -210,6 +226,15 @@ export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
             <Play className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Run</span>
           </Button>
+          <button
+            onClick={handleDownloadZip}
+            disabled={!currentProject?.files?.length}
+            title="Download project as ZIP"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-muted)] hover:text-[var(--foreground)] hover:border-violet-500/50 hover:bg-violet-600/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">ZIP</span>
+          </button>
           <Button size="sm" onClick={handleDeploy} disabled={deploying}>
             <Rocket className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">{deploying ? 'Deploying...' : 'Deploy'}</span>
