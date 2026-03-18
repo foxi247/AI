@@ -6,7 +6,10 @@ import AIChat from './AIChat'
 import LivePreview from './LivePreview'
 import Terminal from './Terminal'
 import { useWorkspaceStore } from '@/store/workspace'
-import { Eye, Terminal as TermIcon, Play, Globe, Zap, ChevronLeft, Rocket, PanelRight, Save } from 'lucide-react'
+import {
+  Eye, Terminal as TermIcon, Play, Globe, Zap, ChevronLeft,
+  Rocket, PanelLeft, Save, X, ExternalLink, Copy, Check
+} from 'lucide-react'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
@@ -22,21 +25,21 @@ type BottomPanel = 'terminal' | 'preview'
 export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
   const { currentProject, setCurrentProject, addTerminalOutput, isGenerating } = useWorkspaceStore()
   const [bottomPanel, setBottomPanel] = useState<BottomPanel>('terminal')
-  const [showLivePreview, setShowLivePreview] = useState(true)
-  const [deployed, setDeployed] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [showFilePanel, setShowFilePanel] = useState(true)
+  const [deployUrl, setDeployUrl] = useState<string | null>(null)
+  const [deploying, setDeploying] = useState(false)
+  const [copied, setCopied] = useState(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Load project from Supabase on mount
   useEffect(() => {
     const load = async () => {
       try {
-        // Try Supabase first
         const p = await getProject(projectId)
         setCurrentProject(p)
       } catch {
-        // Fallback: might be a new project already in store
         console.log('Project not in DB yet or offline')
       }
     }
@@ -48,9 +51,7 @@ export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
     if (!currentProject) return
     setSaving(true)
     try {
-      await Promise.all(
-        currentProject.files.map((f) => upsertFile(currentProject.id, f))
-      )
+      await Promise.all(currentProject.files.map((f) => upsertFile(currentProject.id, f)))
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e) {
@@ -60,7 +61,6 @@ export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
     }
   }, [currentProject])
 
-  // Debounced auto-save when files change
   useEffect(() => {
     if (!currentProject) return
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
@@ -73,7 +73,6 @@ export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
   useEffect(() => {
     if (initialPrompt && currentProject && !promptSentRef.current) {
       promptSentRef.current = true
-      // Small delay to let the workspace render fully
       setTimeout(() => {
         const event = new CustomEvent('ai:sendPrompt', { detail: initialPrompt })
         window.dispatchEvent(event)
@@ -90,22 +89,33 @@ export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
   }
 
   const handleDeploy = async () => {
+    setDeploying(true)
     addTerminalOutput('$ devforge deploy --production')
     addTerminalOutput('Building project...')
     setTimeout(() => addTerminalOutput('✓ Build successful (0.3s)'), 600)
     setTimeout(() => addTerminalOutput('Uploading to edge network...'), 900)
-    const deployUrl = `https://${currentProject?.name.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).slice(2, 7)}.devforge.app`
-    setTimeout(() => addTerminalOutput(`✓ Deployed! ${deployUrl}`), 1400)
-    setTimeout(() => addTerminalOutput('$ '), 1500)
-    setTimeout(() => setDeployed(true), 1400)
 
-    // Save deploy URL to DB
+    const url = `https://${(currentProject?.name || 'app').toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).slice(2, 7)}.devforge.app`
+
+    setTimeout(() => {
+      addTerminalOutput(`✓ Deployed! ${url}`)
+      addTerminalOutput('$ ')
+      setDeployUrl(url)
+      setDeploying(false)
+      setBottomPanel('terminal')
+    }, 1400)
+
     if (currentProject) {
       const supabase = createClient()
-      await supabase.from('projects').update({ deploy_url: deployUrl }).eq('id', currentProject.id)
+      await supabase.from('projects').update({ deploy_url: url }).eq('id', currentProject.id)
     }
+  }
 
-    setBottomPanel('terminal')
+  const handleCopyUrl = () => {
+    if (!deployUrl) return
+    navigator.clipboard.writeText(deployUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   if (!currentProject) {
@@ -120,20 +130,32 @@ export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--background)] overflow-hidden">
+    <div className="h-[100dvh] flex flex-col bg-[var(--background)] overflow-hidden">
       {/* Top bar */}
-      <header className="h-12 flex items-center justify-between px-4 border-b border-[var(--border)] bg-[var(--surface)] shrink-0 z-10">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link href="/dashboard" className="text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors shrink-0">
+      <header className="h-12 flex items-center justify-between px-3 border-b border-[var(--border)] bg-[var(--surface)] shrink-0 z-10 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Link href="/dashboard" className="text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors shrink-0 p-1">
             <ChevronLeft className="w-4 h-4" />
           </Link>
+
+          {/* Left panel toggle */}
+          <button
+            onClick={() => setShowFilePanel((v) => !v)}
+            className={`p-1.5 rounded-lg transition-colors shrink-0 ${showFilePanel ? 'text-violet-400 bg-violet-600/10' : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'}`}
+            title={showFilePanel ? 'Hide files' : 'Show files'}
+          >
+            <PanelLeft className="w-3.5 h-3.5" />
+          </button>
+
           <div className="w-px h-4 bg-[var(--border)] shrink-0" />
-          <div className="flex items-center gap-2 min-w-0">
+
+          <div className="flex items-center gap-1.5 min-w-0">
             <div className="w-5 h-5 rounded bg-gradient-to-br from-violet-600 to-purple-500 flex items-center justify-center shrink-0">
               <Zap className="w-3 h-3 text-white" />
             </div>
             <span className="text-sm font-semibold truncate">{currentProject.name}</span>
           </div>
+
           {/* Save indicator */}
           <div className="flex items-center gap-1 text-[10px] shrink-0">
             {saving && <span className="flex items-center gap-1 text-[var(--text-muted)]"><Save className="w-3 h-3 animate-pulse" />saving...</span>}
@@ -141,49 +163,73 @@ export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => setShowLivePreview(!showLivePreview)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${showLivePreview ? 'bg-violet-600/20 text-violet-400' : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'}`}
-          >
-            <PanelRight className="w-3.5 h-3.5" />
-            Preview
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          {deployed && (
-            <div className="flex items-center gap-1.5 text-xs text-green-400 bg-green-400/10 border border-green-400/20 rounded-lg px-3 py-1.5">
-              <Globe className="w-3.5 h-3.5" />
-              Live
-            </div>
-          )}
+        <div className="flex items-center gap-1.5 shrink-0">
           <Button variant="secondary" size="sm" onClick={handleRun} disabled={isGenerating}>
             <Play className="w-3.5 h-3.5" />
             Run
           </Button>
-          <Button size="sm" onClick={handleDeploy}>
+          <Button size="sm" onClick={handleDeploy} disabled={deploying}>
             <Rocket className="w-3.5 h-3.5" />
-            Deploy
+            {deploying ? 'Deploying...' : 'Deploy'}
           </Button>
         </div>
       </header>
 
+      {/* Deploy success toast */}
+      {deployUrl && (
+        <div className="shrink-0 bg-green-950 border-b border-green-500/30 px-4 py-2.5 flex items-center justify-between gap-3 z-20">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
+            <Globe className="w-3.5 h-3.5 text-green-400 shrink-0" />
+            <span className="text-xs text-green-300 font-medium shrink-0">Deployed!</span>
+            <a
+              href={deployUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-green-400 hover:text-green-300 underline truncate flex items-center gap-1"
+            >
+              {deployUrl}
+              <ExternalLink className="w-3 h-3 shrink-0" />
+            </a>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={handleCopyUrl}
+              className="p-1.5 rounded-lg text-green-400 hover:bg-green-500/10 transition-colors"
+              title="Copy URL"
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              onClick={() => setDeployUrl(null)}
+              className="p-1.5 rounded-lg text-green-400 hover:bg-green-500/10 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main workspace */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* File Explorer */}
-        <div className="w-44 shrink-0 border-r border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-          <FileExplorer />
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* File Explorer — collapsible with smooth animation */}
+        <div
+          className="shrink-0 border-r border-[var(--border)] bg-[var(--surface)] overflow-hidden transition-all duration-300 ease-in-out"
+          style={{ width: showFilePanel ? '176px' : '0px', opacity: showFilePanel ? 1 : 0 }}
+        >
+          <div style={{ width: '176px' }}>
+            <FileExplorer />
+          </div>
         </div>
 
         {/* Editor + Terminal */}
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          {/* Code Editor — takes 65% */}
+          {/* Code Editor */}
           <div className="flex-[65] overflow-hidden border-b border-[var(--border)]">
             <CodeEditor />
           </div>
 
-          {/* Bottom Panel — takes 35% */}
+          {/* Bottom Panel */}
           <div className="flex-[35] flex flex-col bg-[var(--surface)] min-h-0">
             <div className="flex items-center border-b border-[var(--border)] bg-[var(--surface-2)] shrink-0">
               {(['terminal', 'preview'] as BottomPanel[]).map((panel) => (
@@ -208,22 +254,9 @@ export default function WorkspaceLayout({ projectId, initialPrompt }: Props) {
         </div>
 
         {/* AI Chat */}
-        <div className="w-80 shrink-0 border-l border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+        <div className="w-72 shrink-0 border-l border-[var(--border)] bg-[var(--surface)] overflow-hidden flex flex-col">
           <AIChat />
         </div>
-
-        {/* Live Preview panel */}
-        {showLivePreview && (
-          <div className="w-72 shrink-0 border-l border-[var(--border)] bg-[var(--surface)] flex flex-col overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border)] bg-[var(--surface-2)] text-xs shrink-0">
-              <Eye className="w-3.5 h-3.5 text-violet-400" />
-              <span className="text-[var(--text-muted)]">Live Preview</span>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <LivePreview />
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

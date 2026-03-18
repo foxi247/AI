@@ -35,10 +35,12 @@ export async function createProject(
 ) {
   const supabase = createClient()
 
-  // Ensure profile exists (in case trigger didn't fire on signup)
-  await supabase
-    .from('profiles')
-    .upsert({ id: userId, role: 'user' }, { onConflict: 'id', ignoreDuplicates: true })
+  // Ensure profile exists — ignore recursion/RLS errors, trigger handles this on signup
+  try {
+    await supabase
+      .from('profiles')
+      .upsert({ id: userId, role: 'user' }, { onConflict: 'id', ignoreDuplicates: true })
+  } catch { /* safe to continue */ }
 
   const { data: proj, error: projErr } = await supabase
     .from('projects')

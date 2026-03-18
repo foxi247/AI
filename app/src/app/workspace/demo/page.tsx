@@ -9,7 +9,7 @@ export default function DemoPage() {
 
   useEffect(() => {
     const p = createProject('Demo Project', 'Try DevForge AI with this demo project')
-    router.replace(`/workspace/${p.id}?prompt=${encodeURIComponent('Create a beautiful landing page with hero section, features, and a CTA button. Use a dark theme with purple accents.')}`)
+    router.replace(`/workspace/${p.id}`)
   }, [createProject, router])
 
   return (
