@@ -77,8 +77,11 @@ export default function DashboardPage() {
       setNewName('')
       setCurrentProject(p)
       const url = `/workspace/${p.id}${prompt ? `?prompt=${encodeURIComponent(prompt)}` : ''}`
+
       router.push(url)
-    } catch (e) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : JSON.stringify(e)
+      alert('Ошибка создания проекта: ' + msg)
       console.error('Failed to create project:', e)
     } finally {
       setCreating(false)
