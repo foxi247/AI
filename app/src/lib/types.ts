@@ -151,8 +151,6 @@ export const POPULAR_MODELS = [
   { provider: 'OpenRouter', model: 'nvidia/nemotron-3-nano-30b-a3b:free', name: 'Nemotron 3 Nano 30B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'nvidia/nemotron-nano-12b-v2-vl:free', name: 'Nemotron Nano 12B VL', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'nvidia/nemotron-nano-9b-v2:free', name: 'Nemotron Nano 9B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
-  { provider: 'OpenRouter', model: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
-  { provider: 'OpenRouter', model: 'openai/gpt-oss-20b:free', name: 'GPT-OSS 20B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1 24B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'google/gemma-3-27b-it:free', name: 'Gemma 3 27B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'google/gemma-3-12b-it:free', name: 'Gemma 3 12B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
