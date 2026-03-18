@@ -350,7 +350,7 @@ export default function AIConfigPanel({ onClose }: Props) {
             </p>
             <p className="text-[var(--text-muted)]">• Зарегистрируйтесь на <span className="text-emerald-400">openrouter.ai</span> и получите API ключ</p>
             <p className="text-[var(--text-muted)]">• Ищите <span className="text-emerald-400 font-medium">open</span> в поиске — появятся 12 бесплатных моделей</p>
-            <p className="text-[var(--text-muted)]">• Лучшие: DeepSeek R1, Gemini 2.5 Pro, Llama 4 Maverick, Qwen 2.5 Coder</p>
+            <p className="text-[var(--text-muted)]">• Лучшие: Qwen3 Coder 480B, Llama 3.3 70B, Hermes 3 405B, GPT-OSS 120B</p>
             <p className="text-[var(--text-muted)]">• Лимит: ~20 req/min, 200 req/day на бесплатном плане</p>
           </div>
         </div>
