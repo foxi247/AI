@@ -27,8 +27,13 @@ export async function chatWithAI(request: ChatRequest): Promise<string> {
     })
 
     if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`AI API Error ${response.status}: ${error}`)
+      const raw = await response.text()
+      let message = raw
+      try { message = JSON.parse(raw)?.error || raw } catch { /* keep raw */ }
+      const status = response.status
+      if (status === 429) throw new Error(`⚠️ Rate limited — подождите немного и попробуйте снова`)
+      if (status === 404) throw new Error(`⚠️ Модель недоступна: ${message}`)
+      throw new Error(`AI ошибка ${status}: ${message}`)
     }
 
     if (onChunk && response.body) {

@@ -461,8 +461,12 @@ export default function AIChat() {
         })
 
         if (!res.ok) {
-          const err = await res.text()
-          updateMessage(msgId, `❌ Agent error: ${err}`, false)
+          const raw = await res.text()
+          let msg = raw
+          try { msg = JSON.parse(raw)?.error || raw } catch { /* keep raw */ }
+          if (res.status === 429) msg = '⚠️ Rate limited — подождите немного и попробуйте снова'
+          else if (res.status === 404) msg = `⚠️ Модель недоступна: ${msg}`
+          updateMessage(msgId, `❌ ${msg}`, false)
           return true
         }
 

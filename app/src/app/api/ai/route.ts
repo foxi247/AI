@@ -94,8 +94,13 @@ export async function POST(req: NextRequest) {
       })
 
       if (!response.ok) {
-        const error = await response.text()
-        return NextResponse.json({ error }, { status: response.status })
+        const raw = await response.text()
+        let message = raw
+        try {
+          const parsed = JSON.parse(raw)
+          message = parsed?.error?.message || parsed?.message || parsed?.error || raw
+        } catch { /* keep raw */ }
+        return NextResponse.json({ error: message }, { status: response.status })
       }
 
       if (stream && response.body) {
@@ -137,8 +142,16 @@ export async function POST(req: NextRequest) {
     })
 
     if (!response.ok) {
-      const error = await response.text()
-      return NextResponse.json({ error }, { status: response.status })
+      const raw = await response.text()
+      let message = raw
+      try {
+        const parsed = JSON.parse(raw)
+        message = parsed?.error?.message || parsed?.message || parsed?.error || raw
+      } catch { /* keep raw */ }
+      const status = response.status
+      if (status === 429) message = `Rate limited: ${message}`
+      else if (status === 404) message = `Model not found: ${message}`
+      return NextResponse.json({ error: message }, { status })
     }
 
     if (stream && response.body) {

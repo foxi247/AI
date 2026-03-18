@@ -158,7 +158,6 @@ export const POPULAR_MODELS = [
   { provider: 'OpenRouter', model: 'google/gemma-3-4b-it:free', name: 'Gemma 3 4B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'google/gemma-3n-e4b-it:free', name: 'Gemma 3n 4B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'google/gemma-3n-e2b-it:free', name: 'Gemma 3n 2B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
-  { provider: 'OpenRouter', model: 'minimax/minimax-m2.5:free', name: 'MiniMax M2.5', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'arcee-ai/trinity-large-preview:free', name: 'Arcee Trinity Large', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'arcee-ai/trinity-mini:free', name: 'Arcee Trinity Mini', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
   { provider: 'OpenRouter', model: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', name: 'Dolphin Mistral 24B', baseUrl: 'https://openrouter.ai/api/v1', isFree: true },
