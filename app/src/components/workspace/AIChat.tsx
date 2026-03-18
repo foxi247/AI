@@ -280,22 +280,24 @@ export default function AIChat() {
   const runOrchestration = useCallback(async (userContent: string) => {
     const planner = agents.find((a) => a.role === 'planner')
     const coder = agents.find((a) => a.role === 'coder') || agents.find((a) => a.role === 'fullstack')
-    const orchestrator = agents.find((a) => a.role === 'architect') || planner || agents[0]
+    const orchestrator = agents.find((a) => a.role === 'architect' && a.id !== planner?.id)
     if (!planner || !coder || agents.length < 2) return false
 
     const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-    // ① Orchestrator — brief intro
-    const orchMsgId = addMessage({
-      role: 'assistant', content: '',
-      agentId: orchestrator.id, agentName: orchestrator.name, agentRole: orchestrator.role,
-      isStreaming: true,
-    })
-    await delay(300)
-    updateMessage(orchMsgId,
-      `Понял задачу! Передаю планировщику **${planner.name}** для составления плана...`, false)
+    // ① Orchestrator intro — only show if it's a DIFFERENT agent from planner
+    if (orchestrator) {
+      const orchMsgId = addMessage({
+        role: 'assistant', content: '',
+        agentId: orchestrator.id, agentName: orchestrator.name, agentRole: orchestrator.role,
+        isStreaming: true,
+      })
+      await delay(300)
+      updateMessage(orchMsgId,
+        `Понял задачу! Передаю **${planner.name}** для составления плана...`, false)
+      await delay(700)
+    }
 
-    await delay(700)
 
     // ② Planner — creates 6-item plan
     const planMsgId = addMessage({
@@ -333,14 +335,15 @@ Example:
 
     await delay(600)
 
-    // ③ Orchestrator hands off to coder
+    // ③ Handoff message — planner tells coder to start
+    const handoffAgent = orchestrator || planner
     const handoffId = addMessage({
       role: 'assistant', content: '',
-      agentId: orchestrator.id, agentName: orchestrator.name, agentRole: orchestrator.role,
+      agentId: handoffAgent.id, agentName: handoffAgent.name, agentRole: handoffAgent.role,
       isStreaming: false,
     })
     updateMessage(handoffId,
-      `План готов! Передаю **${coder.name}** для реализации всех ${planItems.length} пунктов...`, false)
+      `✅ План готов (${planItems.length} шагов). Передаю **${coder.name}** — начинает реализацию...`, false)
 
     await delay(500)
 
@@ -351,13 +354,19 @@ Example:
       isStreaming: true,
     })
 
+    const coderSystemEnforcement = `\n\n## THIS IS CRITICAL — READ BEFORE RESPONDING:
+ONLY output the 3 file blocks (index.html, style.css, script.js) + a short 3-5 bullet summary.
+DO NOT write any markdown headers, explanations, step descriptions, or plan recaps.
+DO NOT write React, TypeScript, or component files.
+Just: code blocks → brief summary. Nothing else.`
+
     let coderContent = ''
     await chatWithAI({
       messages: [
-        { role: 'system', content: buildSystemPrompt(coder) },
+        { role: 'system', content: buildSystemPrompt(coder) + coderSystemEnforcement },
         {
           role: 'user',
-          content: `Implement this project completely:\n\nUser request: ${userContent}\n\nPlan to follow:\n${planContent}\n\nGenerate ALL files. Follow the plan exactly.`,
+          content: `Build this completely: ${userContent}\n\nPlan:\n${planContent}\n\nGenerate ONLY index.html + style.css + script.js. No React. No explanations. Just the files + short summary.`,
         },
       ],
       agent: coder,
