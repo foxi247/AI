@@ -32,7 +32,7 @@ interface WorkspaceState {
   deleteFile: (fileId: string) => void
 
   addMessage: (msg: Omit<Message, 'id' | 'timestamp'>) => string
-  updateMessage: (id: string, content: string, isStreaming?: boolean, planItems?: import('@/lib/types').PlanItem[]) => void
+  updateMessage: (id: string, content: string, isStreaming?: boolean, planItems?: import('@/lib/types').PlanItem[], toolCallEvents?: import('@/lib/types').ToolCallEvent[]) => void
   updatePlanItem: (messageId: string, index: number, done: boolean) => void
   clearMessages: () => void
 
@@ -205,11 +205,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         return id
       },
 
-      updateMessage: (id, content, isStreaming, planItems) =>
+      updateMessage: (id, content, isStreaming, planItems, toolCallEvents) =>
         set((s) => {
           const newMessages = s.messages.map((m) =>
             m.id === id
-              ? { ...m, content, isStreaming: isStreaming ?? false, ...(planItems !== undefined ? { planItems } : {}) }
+              ? {
+                  ...m, content, isStreaming: isStreaming ?? false,
+                  ...(planItems !== undefined ? { planItems } : {}),
+                  ...(toolCallEvents !== undefined ? { toolCallEvents } : {}),
+                }
               : m
           )
           const pid = s.currentProject?.id

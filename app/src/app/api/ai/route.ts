@@ -7,11 +7,23 @@ const DEFAULT_MODEL = 'codestral-latest'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { messages, model, apiKey, baseUrl, stream } = body
+    const { messages, model, apiKey, baseUrl, stream, tools, tool_choice } = body
 
     const url = `${baseUrl || DEFAULT_BASE_URL}/chat/completions`
     const key = apiKey || DEFAULT_API_KEY
     const mdl = model || DEFAULT_MODEL
+
+    const requestBody: Record<string, unknown> = {
+      model: mdl,
+      messages,
+      stream: Boolean(stream),
+      max_tokens: 8192,
+      temperature: 0.7,
+    }
+    if (tools?.length) {
+      requestBody.tools = tools
+      requestBody.tool_choice = tool_choice || 'auto'
+    }
 
     const response = await fetch(url, {
       method: 'POST',
@@ -19,13 +31,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${key}`,
       },
-      body: JSON.stringify({
-        model: mdl,
-        messages,
-        stream: Boolean(stream),
-        max_tokens: 4096,
-        temperature: 0.7,
-      }),
+      body: JSON.stringify(requestBody),
     })
 
     if (!response.ok) {

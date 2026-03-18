@@ -17,6 +17,14 @@ export interface PlanItem {
   done: boolean
 }
 
+export interface ToolCallEvent {
+  id: string
+  name: string
+  args: Record<string, string>
+  result?: string
+  status: 'running' | 'done' | 'error'
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -25,6 +33,7 @@ export interface Message {
   agentName?: string
   agentRole?: AIRole
   planItems?: PlanItem[]
+  toolCallEvents?: ToolCallEvent[]
   timestamp: Date
   isStreaming?: boolean
 }

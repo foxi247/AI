@@ -6,8 +6,8 @@ import {
   BrainCircuit, Code2, PenTool, Search, Download
 } from 'lucide-react'
 import { useWorkspaceStore } from '@/store/workspace'
-import { AI_ROLES, AIRole, PlanItem } from '@/lib/types'
-import { chatWithAI, buildSystemPrompt } from '@/lib/mistral'
+import { AI_ROLES, AIRole, PlanItem, ToolCallEvent } from '@/lib/types'
+import { chatWithAI, buildSystemPrompt, buildAgentSystemPrompt } from '@/lib/mistral'
 import AIConfigPanel from '@/components/ai-config/AIConfigPanel'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -178,6 +178,96 @@ function StreamingBubble({ role, agentName, content }: { role?: AIRole; agentNam
   )
 }
 
+// ─── Agent Tools Definitions ──────────────────────────────────────────────────
+
+const AGENT_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'read_file',
+      description: 'Read the content of a file in the current project',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string', description: 'File path, e.g. index.html, style.css, script.js' } },
+        required: ['path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'write_file',
+      description: 'Create or overwrite a file in the project with complete content',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'File path, e.g. index.html' },
+          content: { type: 'string', description: 'Complete file content — never truncated' },
+        },
+        required: ['path', 'content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_files',
+      description: 'List all files currently in the project',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_file',
+      description: 'Delete a file from the project',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string', description: 'File path to delete' } },
+        required: ['path'],
+      },
+    },
+  },
+]
+
+const TOOL_META: Record<string, { icon: string; label: string; color: string }> = {
+  read_file:   { icon: '📖', label: 'Reading',  color: '#06b6d4' },
+  write_file:  { icon: '✍️',  label: 'Writing',  color: '#7c3aed' },
+  list_files:  { icon: '📋', label: 'Listing',  color: '#f59e0b' },
+  delete_file: { icon: '🗑️', label: 'Deleting', color: '#ef4444' },
+}
+
+// ─── Tool Call Display ─────────────────────────────────────────────────────────
+
+function ToolCallDisplay({ events }: { events: ToolCallEvent[] }) {
+  return (
+    <div className="flex flex-col gap-1 my-1.5">
+      {events.map((ev) => {
+        const meta = TOOL_META[ev.name] || { icon: '🔧', label: ev.name, color: '#7c3aed' }
+        const argStr = Object.entries(ev.args)
+          .map(([k, v]) => `${k}="${String(v).length > 40 ? String(v).slice(0, 40) + '…' : String(v)}"`)
+          .join(', ')
+        return (
+          <div key={ev.id}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-mono border transition-all"
+            style={{
+              borderColor: ev.status === 'done' ? '#16a34a40' : ev.status === 'error' ? '#ef444440' : `${meta.color}40`,
+              background: ev.status === 'done' ? '#16a34a08' : ev.status === 'error' ? '#ef444408' : `${meta.color}08`,
+            }}
+          >
+            <span>{meta.icon}</span>
+            <span style={{ color: meta.color }} className="font-semibold">{ev.name}</span>
+            <span className="text-[var(--text-muted)] truncate flex-1">({argStr})</span>
+            {ev.status === 'running' && <Loader2 className="w-3 h-3 animate-spin shrink-0" style={{ color: meta.color }} />}
+            {ev.status === 'done'    && <span className="text-green-400 shrink-0">✓</span>}
+            {ev.status === 'error'   && <span className="text-red-400 shrink-0">✗</span>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AIChat() {
@@ -185,11 +275,13 @@ export default function AIChat() {
     messages, addMessage, updateMessage, updatePlanItem, clearMessages,
     agents, activeAgentId,
     currentProject, activeFile,
-    updateFileContent, addFile, setIsGenerating, isGenerating,
+    updateFileContent, addFile, deleteFile, setIsGenerating, isGenerating,
+    addTerminalOutput,
   } = useWorkspaceStore()
 
   const [input, setInput] = useState('')
   const [showConfig, setShowConfig] = useState(false)
+  const [agentMode, setAgentMode] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -243,6 +335,154 @@ export default function AIChat() {
     }
     return applied
   }, [currentProject, updateFileContent, addFile])
+
+  // ─── Tool executor ──────────────────────────────────────────────────────────
+
+  const executeTool = useCallback(async (name: string, args: Record<string, string>): Promise<string> => {
+    switch (name) {
+      case 'read_file': {
+        if (!currentProject) return 'Error: No project open'
+        const f = currentProject.files.find(
+          (f) => f.path === args.path || f.name === args.path || f.name === (args.path || '').split('/').pop()
+        )
+        if (!f) return `Error: "${args.path}" not found. Files: ${currentProject.files.map((f) => f.path).join(', ')}`
+        return f.content
+      }
+      case 'write_file': {
+        const { path, content } = args
+        if (!path || content === undefined) return 'Error: path and content required'
+        const filename = path.split('/').pop() || path
+        const ext = filename.split('.').pop()?.toLowerCase() || ''
+        const langMap: Record<string, string> = {
+          html: 'html', css: 'css', js: 'javascript', ts: 'typescript',
+          tsx: 'typescript', jsx: 'javascript', py: 'python', json: 'json', md: 'markdown',
+        }
+        const language = langMap[ext] || 'plaintext'
+        const existing = currentProject?.files.find((f) => f.path === path || f.name === filename)
+        if (existing) {
+          updateFileContent(existing.id, content)
+        } else {
+          addFile({ name: filename, path, content, language })
+        }
+        return `Written ${filename} (${content.length} chars)`
+      }
+      case 'list_files': {
+        if (!currentProject?.files.length) return 'Project is empty — no files yet'
+        return currentProject.files
+          .map((f) => `${f.path}  (${f.content.length} chars, ${f.language})`)
+          .join('\n')
+      }
+      case 'delete_file': {
+        if (!currentProject) return 'Error: No project open'
+        const f = currentProject.files.find((f) => f.path === args.path || f.name === args.path)
+        if (!f) return `Error: "${args.path}" not found`
+        deleteFile(f.id)
+        return `Deleted ${args.path}`
+      }
+      default:
+        return `Unknown tool: ${name}`
+    }
+  }, [currentProject, updateFileContent, addFile, deleteFile])
+
+  // ─── Agentic loop ────────────────────────────────────────────────────────────
+
+  const runAgentLoop = useCallback(async (userContent: string): Promise<boolean> => {
+    if (!activeAgent) return false
+
+    const msgId = addMessage({
+      role: 'assistant', content: '',
+      agentId: activeAgent.id, agentName: activeAgent.name, agentRole: activeAgent.role,
+      isStreaming: true, toolCallEvents: [],
+    })
+
+    const projectContext = currentProject
+      ? `\nProject: "${currentProject.name}"\nFiles: ${currentProject.files.map((f) => f.path).join(', ') || 'none (empty project)'}`
+      : '\nNo project open.'
+
+    const apiMessages: Array<Record<string, unknown>> = [
+      { role: 'system', content: buildAgentSystemPrompt() + projectContext },
+      ...messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user', content: userContent },
+    ]
+
+    let iterations = 0
+    const MAX = 12
+    const allToolEvents: ToolCallEvent[] = []
+
+    try {
+      while (iterations < MAX) {
+        iterations++
+
+        const res = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: apiMessages,
+            model: activeAgent.model,
+            apiKey: activeAgent.apiKey,
+            baseUrl: activeAgent.baseUrl,
+            tools: AGENT_TOOLS,
+            tool_choice: 'auto',
+            stream: false,
+          }),
+        })
+
+        if (!res.ok) {
+          const err = await res.text()
+          updateMessage(msgId, `❌ Agent error: ${err}`, false)
+          return true
+        }
+
+        const data = await res.json()
+        const choice = data.choices?.[0]
+        if (!choice) break
+
+        const assistantMsg = choice.message
+        apiMessages.push(assistantMsg)
+
+        if (choice.finish_reason === 'tool_calls' && assistantMsg.tool_calls?.length) {
+          // Add new tool calls as running
+          const newEvents: ToolCallEvent[] = assistantMsg.tool_calls.map((tc: {
+            id: string; function: { name: string; arguments: string }
+          }) => ({
+            id: tc.id,
+            name: tc.function.name,
+            args: (() => { try { return JSON.parse(tc.function.arguments || '{}') } catch { return {} } })(),
+            status: 'running' as const,
+          }))
+          allToolEvents.push(...newEvents)
+          updateMessage(msgId, assistantMsg.content || '', true, undefined, [...allToolEvents])
+
+          // Execute each tool
+          for (let i = 0; i < assistantMsg.tool_calls.length; i++) {
+            const tc = assistantMsg.tool_calls[i]
+            const evIdx = allToolEvents.length - assistantMsg.tool_calls.length + i
+            const args = newEvents[i].args
+
+            const result = await executeTool(tc.function.name, args)
+
+            allToolEvents[evIdx] = { ...allToolEvents[evIdx], result, status: 'done' }
+            updateMessage(msgId, assistantMsg.content || '', true, undefined, [...allToolEvents])
+
+            apiMessages.push({ role: 'tool', content: result, tool_call_id: tc.id })
+          }
+        } else {
+          // Final response
+          const finalContent = assistantMsg.content || ''
+          updateMessage(msgId, finalContent, false, undefined, allToolEvents)
+          const applied = applyCodeChanges(finalContent)
+          if (applied.length > 0 || allToolEvents.some((e) => e.name === 'write_file')) {
+            setTimeout(() => window.dispatchEvent(new CustomEvent('workspace:previewReady')), 500)
+          }
+          break
+        }
+      }
+    } catch (err) {
+      updateMessage(msgId, `❌ Agent error: ${err instanceof Error ? err.message : 'Unknown'}`, false, undefined, allToolEvents)
+    }
+
+    return true
+  }, [activeAgent, currentProject, messages, addMessage, updateMessage, executeTool, applyCodeChanges])
 
   // ─── Single agent call ──────────────────────────────────────────────────────
 
@@ -407,6 +647,12 @@ Just: code blocks → brief summary. Nothing else.`
     addMessage({ role: 'user', content })
 
     try {
+      // Agent mode: tool-calling loop
+      if (agentMode) {
+        await runAgentLoop(content)
+        return
+      }
+
       // Try multi-agent orchestration if applicable
       if (agents.length >= 2 && isBuildRequest(content)) {
         const orchestrated = await runOrchestration(content)
@@ -522,6 +768,19 @@ Just: code blocks → brief summary. Nothing else.`
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {/* Agent Mode Toggle */}
+            <button
+              onClick={() => setAgentMode((v) => !v)}
+              title={agentMode ? 'Agent Mode ON — click to disable' : 'Enable Agent Mode (tool use)'}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all ${
+                agentMode
+                  ? 'bg-violet-600/20 border-violet-500/50 text-violet-300'
+                  : 'bg-transparent border-[var(--border)] text-[var(--text-muted)] hover:border-violet-500/40 hover:text-violet-400'
+              }`}
+            >
+              <Sparkles className="w-3 h-3" />
+              Agent
+            </button>
             {messages.length > 0 && (
               <>
                 <button onClick={handleDownload} className="p-1.5 rounded text-[var(--text-muted)] hover:text-green-400 hover:bg-green-600/10 transition-colors" title="Скачать чат">
@@ -607,6 +866,9 @@ Just: code blocks → brief summary. Nothing else.`
                         <p className="whitespace-pre-wrap">
                           {displayContent || (appliedFiles.length > 0 ? '✅ Готово! Все файлы применены в редакторе.' : msg.content)}
                         </p>
+                        {msg.toolCallEvents && msg.toolCallEvents.length > 0 && (
+                          <ToolCallDisplay events={msg.toolCallEvents} />
+                        )}
                         {msg.planItems && msg.planItems.length > 0 && (
                           <PlanDisplay items={msg.planItems} />
                         )}
