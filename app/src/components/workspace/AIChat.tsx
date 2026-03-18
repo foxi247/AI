@@ -928,7 +928,7 @@ Just: code blocks → brief summary. Nothing else.`
               placeholder={isGenerating ? 'Agents are working...' : isMultiAgent ? 'Ask the team to build something...' : 'Ask AI to build something...'}
               disabled={isGenerating}
               rows={1}
-              className="flex-1 bg-transparent text-xs resize-none outline-none placeholder:text-[var(--text-muted)] disabled:opacity-50 max-h-28"
+              className="flex-1 bg-transparent text-xs resize-none outline-none placeholder:text-[var(--text-muted)] disabled:opacity-50 max-h-28 [font-size:16px] md:text-xs"
             />
             <button
               onClick={() => sendMessage()}
