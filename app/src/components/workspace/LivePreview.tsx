@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { RefreshCw, ExternalLink, Globe, Maximize2, Zap, Code2 } from 'lucide-react'
+import { RefreshCw, ExternalLink, Globe, Maximize2, Zap } from 'lucide-react'
 import { useWorkspaceStore } from '@/store/workspace'
 
 export default function LivePreview() {
@@ -11,7 +11,6 @@ export default function LivePreview() {
   const [wcUrl, setWcUrl] = useState<string | null>(null)
   const [mode, setMode] = useState<'static' | 'webcontainer'>('static')
 
-  // Try to get WebContainer URL from session storage (set by Terminal when server starts)
   useEffect(() => {
     const stored = sessionStorage.getItem('wc_server_url')
     if (stored) { setWcUrl(stored); setMode('webcontainer') }
@@ -26,23 +25,37 @@ export default function LivePreview() {
     if (!currentProject) return '<p style="font-family:sans-serif;padding:2rem;color:#888">No project loaded</p>'
 
     const htmlFile = currentProject.files.find((f) => f.name.endsWith('.html'))
-    const cssFile = currentProject.files.find((f) => f.name.endsWith('.css'))
-    const jsFile = currentProject.files.find((f) => f.name.endsWith('.js'))
+    const cssFiles = currentProject.files.filter((f) => f.name.endsWith('.css'))
+    const jsFiles = currentProject.files.filter((f) => f.name.endsWith('.js'))
 
-    if (htmlFile) {
-      let html = htmlFile.content
-      if (cssFile && !html.includes('style.css')) {
-        html = html.replace('</head>', `<style>${cssFile.content}</style></head>`)
+    let html = htmlFile?.content || '<!DOCTYPE html><html><head></head><body></body></html>'
+
+    // Remove external CSS/JS links — they don't resolve in blob URL context
+    html = html.replace(/<link[^>]+rel=["']stylesheet["'][^>]*>/gi, '')
+    html = html.replace(/<link[^>]+\.css[^>]*>/gi, '')
+    html = html.replace(/<script[^>]+src=["'][^"']*\.js["'][^>]*><\/script>/gi, '')
+
+    // Inline all CSS files
+    if (cssFiles.length > 0) {
+      const allCss = cssFiles.map((f) => f.content).join('\n')
+      if (html.includes('</head>')) {
+        html = html.replace('</head>', `<style>${allCss}</style></head>`)
+      } else {
+        html = `<style>${allCss}</style>` + html
       }
-      if (jsFile && !html.includes('script.js')) {
-        html = html.replace('</body>', `<script>${jsFile.content}<\/script></body>`)
-      }
-      return html
     }
 
-    const css = cssFile?.content || ''
-    const js = jsFile?.content || ''
-    return `<!DOCTYPE html><html><head><style>${css}</style></head><body>${js ? `<script>${js}<\/script>` : ''}</body></html>`
+    // Inline all JS files
+    if (jsFiles.length > 0) {
+      const allJs = jsFiles.map((f) => f.content).join('\n')
+      if (html.includes('</body>')) {
+        html = html.replace('</body>', `<script>${allJs}<\/script></body>`)
+      } else {
+        html += `<script>${allJs}<\/script>`
+      }
+    }
+
+    return html
   }
 
   const loadStatic = () => {
@@ -69,7 +82,6 @@ export default function LivePreview() {
     }
   }
 
-  // Auto-refresh on file changes (static mode)
   useEffect(() => {
     if (mode === 'static') {
       const t = setTimeout(loadStatic, 600)
@@ -78,7 +90,6 @@ export default function LivePreview() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject?.files, mode])
 
-  // Load WebContainer URL when available
   useEffect(() => {
     if (mode === 'webcontainer' && wcUrl && iframeRef.current) {
       setIsLoading(true)
@@ -98,7 +109,6 @@ export default function LivePreview() {
 
   return (
     <div className={`flex flex-col h-full ${fullscreen ? 'fixed inset-0 z-50 bg-[var(--background)]' : ''}`}>
-      {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] bg-[var(--surface-2)] shrink-0">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <Globe className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
@@ -113,15 +123,6 @@ export default function LivePreview() {
         </div>
         <div className="flex items-center gap-1 ml-2 shrink-0">
           {isLoading && <RefreshCw className="w-3.5 h-3.5 text-violet-400 animate-spin-slow" />}
-          {mode === 'static' && (
-            <button
-              onClick={() => setMode('static')}
-              className="p-1.5 rounded hover:bg-[var(--surface-3)] text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors"
-              title="Static HTML preview"
-            >
-              <Code2 className="w-3.5 h-3.5" />
-            </button>
-          )}
           <button onClick={refresh} className="p-1.5 rounded hover:bg-[var(--surface-3)] text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors" title="Refresh">
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
@@ -134,7 +135,6 @@ export default function LivePreview() {
         </div>
       </div>
 
-      {/* iframe */}
       <div className="flex-1 bg-white relative overflow-hidden">
         <iframe
           ref={iframeRef}

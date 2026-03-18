@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Settings, RotateCcw, Sparkles, FileCode, CheckCircle2, Loader2 } from 'lucide-react'
+import { Send, Bot, User, Settings, RotateCcw, Sparkles, FileCode, CheckCircle2, Loader2, Eye } from 'lucide-react'
 import { useWorkspaceStore } from '@/store/workspace'
 import { AI_ROLES } from '@/lib/types'
 import { chatWithAI, buildSystemPrompt } from '@/lib/mistral'
@@ -126,9 +126,16 @@ export default function AIChat() {
         },
       })
 
-      // Apply code to editor, store full content for reference
-      applyCodeChanges(fullContent)
+      // Apply code to editor
+      const applied = applyCodeChanges(fullContent)
       updateMessage(assistantId, fullContent, false)
+
+      // If code was applied, dispatch preview event after short delay
+      if (applied.length > 0) {
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('workspace:previewReady'))
+        }, 800)
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error'
       updateMessage(assistantId, `❌ Error: ${errMsg}\n\nPlease check your API key in AI Configuration.`, false)
@@ -259,9 +266,9 @@ export default function AIChat() {
                     )}
                   </div>
 
-                  {/* Applied files badge */}
+                  {/* Applied files badge + Preview button */}
                   {appliedFiles.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1 items-center">
                       <div className="flex items-center gap-1 text-[10px] text-green-400 bg-green-400/10 border border-green-400/20 rounded-full px-2 py-0.5">
                         <CheckCircle2 className="w-3 h-3" />
                         <span>Applied to editor</span>
@@ -272,6 +279,13 @@ export default function AIChat() {
                           {f}
                         </div>
                       ))}
+                      <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('workspace:openPreview'))}
+                        className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-full px-2.5 py-0.5 hover:bg-amber-400/20 transition-colors font-medium"
+                      >
+                        <Eye className="w-3 h-3" />
+                        View Preview
+                      </button>
                     </div>
                   )}
                 </div>
