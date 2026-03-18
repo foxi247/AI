@@ -149,8 +149,6 @@ export async function POST(req: NextRequest) {
         message = parsed?.error?.message || parsed?.message || parsed?.error || raw
       } catch { /* keep raw */ }
       const status = response.status
-      if (status === 429) message = `Rate limited: ${message}`
-      else if (status === 404) message = `Model not found: ${message}`
       return NextResponse.json({ error: message }, { status })
     }
 
